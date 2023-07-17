@@ -1,6 +1,0 @@
-# ninja log v5
-2	186	7113168408434432	CMakeFiles/nexus.dir/core/language/lexer.cpp.obj	1f5cd59ae7705789
-0	127	7113190495812501	build.ninja	f327fc9d413382ad
-2	393	7113169401126050	CMakeFiles/nexus.dir/main.cpp.obj	b5be6a784ca991b0
-393	474	7113169401911201	nexus.exe	7b3a6c83354db132
-3	459	7113095868677979	CMakeFiles/nexus.dir/core/types/vstring.cpp.obj	fa582923ccfe92c6
