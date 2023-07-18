@@ -105,7 +105,7 @@ bool VString::parse_utf8(const char *p_utf8, int p_len, const bool& p_skip_cr) {
     }
 
     if (str_size == 0) {
-        clear();
+        *this = "";
         return false;
     }
 
@@ -245,11 +245,6 @@ void VString::copy_from_unchecked(const wchar_t *p_char, const int &p_length) {
     dst[p_length] = 0;
 }
 
-void VString::operator+=(const VString &p_other) {
-    auto old_size = capacity();
-    data.arr_copy(p_other.ptr(), p_other.capacity(), old_size == 0 ? 0 : capacity() - 1);
-}
-
 std::wostream &operator<<(std::wostream &p_ostream, const VString &p_vstring) {
     p_ostream << p_vstring.ptr();
     return p_ostream;
@@ -356,4 +351,17 @@ std::ostream &operator<<(std::ostream &p_ostream, const VString &p_vstring) {
     p_ostream << as_char_array;
     free(as_char_array);
     return p_ostream;
+}
+
+void VString::operator+=(const VString &p_other) {
+    auto old_size = capacity();
+    data.arr_copy(p_other.ptr(), p_other.capacity(), old_size == 0 ? 0 : capacity() - 1);
+}
+
+void VString::operator+=(const char &p_other) {
+    *this += VString(p_other);
+}
+
+void VString::operator+=(const wchar_t &p_other) {
+    *this += VString(p_other);
 }

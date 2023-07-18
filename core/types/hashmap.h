@@ -16,37 +16,41 @@ private:
         Value value;
         KeyPairValue* next{};
 
+        explicit KeyPairValue(const Key& p_key) { key = p_key; }
         ~KeyPairValue(){
             delete next;
         }
     };
+public:
     struct KPIterator {
     private:
         KeyPairValue** entries{};
-        size_t capacity{};
+        int64_t capacity{};
         KeyPairValue* iterating{};
         int64_t current_index{-1};
     public:
         KPIterator(KeyPairValue** e, size_t cap){
             entries = e;
-            capacity = cap;
+            capacity = (int64_t)cap;
         }
         bool move_next(){
-            auto loop_ran = false;
-            while (!iterating && current_index < capacity){
-                loop_ran = true;
-                iterating = entries[++current_index];
+            while (current_index < capacity){
+                if (iterating && iterating->next) {
+                    iterating = iterating->next;
+                    return true;
+                }
+                else {
+                    iterating = entries[++current_index];
+                    if (current_index < capacity && iterating) return true;
+                }
             }
-            if (current_index >= capacity) {
-                iterating = nullptr; return false;
-            }
-            if (!loop_ran) iterating = iterating->next;
-            return true;
+            return false;
         }
         const KeyPairValue& get_pair() const {
-            return iterating;
+            return *iterating;
         }
     };
+private:
     size_t cap{};
     size_t entries_count{};
     KeyPairValue** entries{};
@@ -62,25 +66,25 @@ private:
         }
         throw std::exception();
     }
-    KeyPairValue* try_get(const Key& p_key) {
+    KeyPairValue* try_get(const Key& p_key) const {
         auto hash = get_index(p_key);
         auto entry = entries[hash];
-        // Create if not exist
         if (!entry) {
-            auto new_entry = new KeyPairValue();
-            new_entry->key = p_key;
-            entries[hash] = new_entry;
-            entries_count++;
-            return new_entry;
+            return nullptr;
         }
         while (entry){
             if (Comparator::compare(entry->key, p_key)) return entry;
             entry = entry->next;
         }
-        // Insert at front if not exist
-        auto new_entry = new KeyPairValue();
-        new_entry->key = p_key;
-        new_entry->next = entries[hash];
+        return nullptr;
+    }
+    KeyPairValue* get_or_create(const Key& p_key){
+        auto trial = try_get(p_key);
+        if (trial) return trial;
+        auto hash = get_index(p_key);
+        auto old_entry = entries[hash];
+        auto new_entry = new KeyPairValue(p_key);
+        new_entry->next = old_entry;
         entries[hash] = new_entry;
         entries_count++;
         return new_entry;
@@ -95,6 +99,7 @@ private:
                 if (prev) prev->next = entry->next;
                 else entries[hash] = entry->next;
                 delete entry;
+                entries_count--;
                 return true;
             }
             prev = entry;
@@ -107,10 +112,12 @@ public:
         return Hasher::hash(p_key) % capacity();
     }
     _FORCE_INLINE_ const Value& operator[](const Key& p_key) const { return get(p_key)->value; }
-    _FORCE_INLINE_ Value& operator[](const Key& p_key) { return try_get(p_key)->value; }
+    _FORCE_INLINE_ Value& operator[](const Key& p_key) { return get_or_create(p_key)->value; }
+    _NO_DISCARD_ _FORCE_INLINE_ bool exists(const Key& p_key) const { return try_get(p_key) != nullptr; }
     _NO_DISCARD_ _FORCE_INLINE_ size_t size() const { return entries_count; }
+    _NO_DISCARD_ _FORCE_INLINE_ bool empty() const { return size() == 0; }
     _NO_DISCARD_ _ALWAYS_INLINE_ uint16_t capacity() const { return cap; }
-    _NO_DISCARD_ _ALWAYS_INLINE_ KPIterator iterator() { return new KPIterator(entries, capacity()); }
+    _NO_DISCARD_ _ALWAYS_INLINE_ KPIterator iterator() { return KPIterator(entries, capacity()); }
     _FORCE_INLINE_ bool erase(const Key& p_key) { return try_erase(p_key); }
     explicit StaticHashMap(const size_t& starting_capacity = 150){
         cap = starting_capacity;
@@ -126,7 +133,7 @@ public:
     }
 };
 
-template <typename Key, typename Value, class Hasher = StandardHasher, class Comparator = StandardComparator<Key>, uint16_t StartingCapacity = 32>
+template <typename Key, typename Value, uint16_t StartingCapacity = 32, class Hasher = StandardHasher, class Comparator = StandardComparator<Key>>
 class HashMap{
 private:
     float growth_factor;
@@ -149,25 +156,37 @@ public:
         // TODO: Custom exception
         // Resize
         if (!is_initialized()) initialize();
-        if (size() / capacity() >= growth_factor){
-            auto new_map = new StaticHashMap<Key, Value, Hasher, Comparator>(capacity() * (1 + growth_factor));
+        const auto curr_factor = (float)size() / capacity();
+        if (curr_factor >= growth_factor){
+            auto new_map = new StaticHashMap<Key, Value, Hasher, Comparator>(capacity() * 2);
             auto it = current_map->iterator();
             while (it.move_next()){
                 const auto& kp = it.get_pair();
-                new_map[kp.key] = kp.value;
+                new_map->operator[](kp.key) = kp.value;
             }
             delete current_map;
             current_map = new_map;
         }
         return current_map->operator[](p_key);
     }
+    _NO_DISCARD_ _FORCE_INLINE_ bool exists(const Key& p_key) const {
+        if (!is_initialized()) return false;
+        return current_map->exists(p_key);
+    }
     _NO_DISCARD_ _FORCE_INLINE_ size_t size() const {
         if (!is_initialized()) return 0;
         return current_map->size();
     }
+    _NO_DISCARD_ _FORCE_INLINE_ bool empty() const {
+        return !is_initialized() || size() == 0;
+    }
     _NO_DISCARD_ _ALWAYS_INLINE_ uint16_t capacity() const {
         if (!is_initialized()) return 0;
         return current_map->capacity();
+    }
+    _NO_DISCARD_ _ALWAYS_INLINE_ typename StaticHashMap<Key, Value, Hasher, Comparator>::KPIterator iterator() {
+        if (!is_initialized()) throw std::exception();
+        return current_map->iterator();
     }
     _FORCE_INLINE_ bool erase(const Key& p_key) {
         if (!is_initialized()) return false;
@@ -177,5 +196,23 @@ public:
         growth_factor = growth;
     }
 };
+template <typename Value, class Hasher = StandardHasher, class Comparator = StandardComparator<Value>, uint16_t StartingCapacity = 32>
+class HashSet{
+private:
+    HashMap<Value, uint8_t, StartingCapacity, Hasher, Comparator> inner_map{};
+public:
+    static _FORCE_INLINE_ HashSet from_array(const Value* p_arr, const size_t& p_len){
+        HashSet re{};
+        for (size_t i = 0; i < p_len; i++){
+            re.add(p_arr[i]);
+        }
+        return re;
+    }
 
+    _FORCE_INLINE_ void add(const Value& p_value) { inner_map[p_value] = 0; }
+    _FORCE_INLINE_ bool erase(const Value& p_value) { return inner_map.erase(p_value); }
+    _NO_DISCARD_ _FORCE_INLINE_ bool exists(const Value& p_value) const { return inner_map.exists(p_value); }
+    _NO_DISCARD_ _FORCE_INLINE_ size_t size() const { return inner_map.size(); }
+    _NO_DISCARD_ _FORCE_INLINE_ bool empty() const { return inner_map.empty(); }
+};
 #endif //NEXUS_HASHMAP_H

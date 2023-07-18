@@ -1,20 +1,23 @@
 #include <iostream>
 #include "core/types/vstring.h"
 #include "core/types/vector.h"
-#include "core/types/stack.h"
-#include "core/types/queue.h"
+#include "core/types/hashmap.h"
+#include "core/language/lexer.h"
 
 int main() {
-    Queue<int> st{};
-    st.enqueue(1);
-    st.enqueue(2);
-    st.enqueue(3);
-
-    auto st2 = st;
-
-    while (!st.empty())
-        std::cout << st.dequeue() << std::endl;
-    while (!st2.empty())
-        std::cout << st2.dequeue() << std::endl;
+    NexusLexer lexer{};
+    VString text = R"(
+        func hello_world(){
+            var a = 237;
+            print("Hello += world!");
+        }
+)";
+    auto re = lexer.tokenize_text(text);
+    const auto& tokens = lexer.extract_tokens();
+    for (int i = 0; i < tokens.size(); i++){
+        const auto& token = tokens[i];
+        std::cout << "(" << (size_t)token.type << ", " << token.lexeme
+                  << ", (" << token.line << ", " << token.column << "))\n";
+    }
     return 0;
 }

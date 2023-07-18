@@ -47,6 +47,10 @@ public:
         if (latest == nullptr) genesis = nullptr;
         return re;
     }
+    _FORCE_INLINE_ T peek_last() const {
+        if (!latest) throw std::out_of_range("Stack is empty");
+        return latest->value;
+    }
     _NO_DISCARD_ _FORCE_INLINE_ size_t size() const { return size_cache; }
     _NO_DISCARD_ _FORCE_INLINE_ bool empty() const { return size() == 0; }
     _NO_DISCARD_ _FORCE_INLINE_ const StackNode* last() const { return latest; }

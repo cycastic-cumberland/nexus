@@ -22,7 +22,8 @@ public:
     _FORCE_INLINE_ wchar_t& operator[](const size_t& idx) { return ptrw()[idx]; }
     _NO_DISCARD_ _FORCE_INLINE_ size_t capacity() const { return data.capacity(); }
     _NO_DISCARD_ _FORCE_INLINE_ size_t length() const { return capacity() == 0 ? 0 : capacity() - 1; }
-    _FORCE_INLINE_ void clear() { data.clear(); }
+    _NO_DISCARD_ _FORCE_INLINE_ bool empty() const { return length() == 0; }
+//    _FORCE_INLINE_ void clear() { data.clear(); }
 
     _NO_DISCARD_ uint32_t hash_u32() const;
     _NO_DISCARD_ bool operator==(const VString& other) const;
@@ -40,6 +41,12 @@ public:
     _FORCE_INLINE_ VString(const VString& p_other) { data = p_other.data; }
     _FORCE_INLINE_ VString(const char* p_str) : VString() { copy_from(p_str); }
     _FORCE_INLINE_ VString(const wchar_t* p_str, const int& p_clip_to = -1) : VString() { copy_from(p_str, p_clip_to); }
+    _FORCE_INLINE_ VString(const wchar_t& p_str) : VString() {
+        data.resize(2);
+        new (&data.ptrw()[0]) wchar_t(p_str);
+        data.ptrw()[1] = L'\0';
+    }
+    _FORCE_INLINE_ VString(const char& p_str) : VString((wchar_t )p_str) {}
     _NO_DISCARD_ _FORCE_INLINE_ VString duplicate() const { return *this; }
     _FORCE_INLINE_ VString& operator=(const VString& p_other) {
         data = p_other.data;
@@ -57,6 +64,8 @@ public:
         return *this + VString(p_str);
     }
     void operator+=(const VString& p_other);
+    void operator+=(const wchar_t& p_other);
+    void operator+=(const char& p_other);
     _FORCE_INLINE_ void operator+=(const char* p_str){
         *this += VString(p_str);
     }
