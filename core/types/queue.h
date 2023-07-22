@@ -47,6 +47,11 @@ public:
         size_cache--;
         return re;
     }
+    _FORCE_INLINE_ void clear(){
+        while (!empty()){
+            dequeue();
+        }
+    }
     _NO_DISCARD_ _FORCE_INLINE_ size_t size() const { return size_cache; }
     _NO_DISCARD_ _FORCE_INLINE_ bool empty() const { return size() == 0; }
     _NO_DISCARD_ _FORCE_INLINE_ const QueueNode* first() const { return genesis; }
@@ -57,9 +62,7 @@ public:
         }
     }
     ~Queue(){
-        while (!empty()){
-            dequeue();
-        }
+        clear();
     }
 };
 

@@ -47,9 +47,14 @@ public:
         if (latest == nullptr) genesis = nullptr;
         return re;
     }
-    _FORCE_INLINE_ T peek_last() const {
+    _FORCE_INLINE_ const T& peek_last() const {
         if (!latest) throw std::out_of_range("Stack is empty");
         return latest->value;
+    }
+    _FORCE_INLINE_ void clear(){
+        while (!empty()){
+            pop();
+        }
     }
     _NO_DISCARD_ _FORCE_INLINE_ size_t size() const { return size_cache; }
     _NO_DISCARD_ _FORCE_INLINE_ bool empty() const { return size() == 0; }
@@ -65,9 +70,7 @@ public:
         }
     }
     ~Stack(){
-        while (!empty()){
-            pop();
-        }
+        clear();
     }
 };
 

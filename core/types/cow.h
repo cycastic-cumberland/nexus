@@ -39,7 +39,7 @@ private:
         if (cow_data->refcount.get() == 1) return;
         auto new_data = new CowData();
         new_data->data = (T*) malloc(sizeof(T) * cow_data->capacity);
-        memmove(new_data->data, cow_data->data, cow_data->capacity * sizeof(T));
+        memcpy(new_data->data, cow_data->data, cow_data->capacity * sizeof(T));
         new_data->capacity = cow_data->capacity;
         unref();
         cow_data = new_data;
@@ -59,6 +59,7 @@ public:
     _FORCE_INLINE_ void clear(){
         move();
         free(cow_data->data);
+        cow_data->data = nullptr;
         cow_data->capacity = 0;
     }
     _FORCE_INLINE_ void resize(const size_t& new_capacity){
@@ -68,7 +69,7 @@ public:
         }
         move();
         auto new_data = (T*)malloc(sizeof(T) * new_capacity);
-        memmove(new_data, cow_data->data,
+        memcpy(new_data, cow_data->data,
                (new_capacity < cow_data->capacity ? new_capacity : cow_data->capacity) * sizeof(T));
         free(cow_data->data);
         cow_data->data = new_data;
@@ -92,11 +93,11 @@ public:
     _FORCE_INLINE_ void arr_copy(const T* p_from, const size_t& p_size, const size_t idx){
         move();
         resize(p_size + idx);
-        memmove(&ptrw()[idx], p_from, sizeof(T) * p_size);
+        memcpy(&ptrw()[idx], p_from, sizeof(T) * p_size);
     }
     _NO_DISCARD_ _ALWAYS_INLINE_ size_t capacity() const { return cow_data->capacity; }
     _NO_DISCARD_ _ALWAYS_INLINE_ const T* ptr() const { return cow_data->data; }
-    _NO_DISCARD_ _ALWAYS_INLINE_ T* ptrw() { return cow_data->data; }
+    _NO_DISCARD_ _ALWAYS_INLINE_ T* ptrw() { move(); return cow_data->data; }
 };
 
 #endif //NEXUS_COW_H

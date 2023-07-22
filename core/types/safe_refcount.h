@@ -150,7 +150,7 @@ class SafeRefCount {
 #ifdef DEV_ENABLED
     _ALWAYS_INLINE_ void _check_unref_sanity() {
 		// This won't catch every misuse, but it's better than nothing.
-//		CRASH_COND_MSG(count.get() == 0,
+//		CRASH_COND_MSG(count.get_instance() == 0,
 //				"Trying to unreference a SafeRefCount which is already zero is wrong and a symptom of it being misused.\n"
 //				"Upon a SafeRefCount reaching zero any object whose lifetime is tied to it, as well as the ref count itself, must be destroyed.\n"
 //				"Moreover, to guarantee that, no multiple threads should be racing to do the final unreferencing to zero.");

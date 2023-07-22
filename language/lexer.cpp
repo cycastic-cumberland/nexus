@@ -3,9 +3,10 @@
 //
 
 #include "lexer.h"
-#include "../types/stack.h"
+#include "../core/types/stack.h"
 
 const char NexusLexer:: token_characters[TK_MAX] = {
+        '\0',
         '\0',
         '\0',
         '\0',
@@ -20,7 +21,6 @@ const char NexusLexer:: token_characters[TK_MAX] = {
         ';',
         ',',
         '.',
-        ':',
         '\\',
         // Operators are not looked up
         '\0',
@@ -33,7 +33,17 @@ const char NexusLexer:: token_characters[TK_MAX] = {
         '\0',
         '\0',
         '\0',
+        '\0',
+        '\0',
+        '\0',
         '\'',
+
+        '`',
+        '~',
+        '@',
+        '#',
+        '$',
+
         '\"',
         '(',
         ')',
@@ -42,6 +52,7 @@ const char NexusLexer:: token_characters[TK_MAX] = {
 };
 
 HashMap<wchar_t, NexusLexer::TokenType, 512>* NexusLexer::tokens_map = nullptr;
+HashMap<VString, NexusLexer::TokenType, 64>* NexusLexer::operators_map = nullptr;
 
 
 NexusLexer::LexicalError NexusLexer::tokenize_text(const VString &text) {
@@ -71,7 +82,7 @@ NexusLexer::LexicalError NexusLexer::tokenize_text(const VString &text) {
     const auto flush_lexeme = [&](LexicalError* err = nullptr) -> void {
         if (current_lexeme.empty()) return;
         if (!tokens.empty() && tokens.last().type == TK_PU_DOUBLE_QUOTE) {
-            flush_lexeme_detailed(current_lexeme, last_line, last_column);
+            flush_lexeme_detailed(current_lexeme, last_line, last_column, TK_STRING);
             current_lexeme = "";
             record_coordinate();
             return;
@@ -79,37 +90,52 @@ NexusLexer::LexicalError NexusLexer::tokenize_text(const VString &text) {
         VString buffer{};
         wchar_t last_char = 0;
         uint32_t current_column_cursor = last_column;
-        const auto assignment_flush_helper = [&](TokenType type) -> void {
-            buffer += L'=';
-            flush_lexeme_detailed(buffer, last_line, current_column_cursor, type);
-            last_char = 0;
-            buffer = "";
-        };
-
+#define ASSIGNMENT_FLUSH_HELPER(type){                                          \
+        buffer += L'=';                                                         \
+        flush_lexeme_detailed(buffer, last_line, current_column_cursor, type);  \
+        last_char = 0;                                                          \
+        buffer = "";                                                            \
+    }
+#define THROW_LEX_ERR(what){                                                    \
+    *err = {LE_INVALID_OPERATOR_PLACEMENT, last_line, current_column_cursor};   \
+    return;                                                                     \
+}
         for (auto i = 0; i < current_lexeme.length(); i++){
             const auto& curr_char = current_lexeme[i];
             switch (curr_char) {
                 case L'+':
                 case L'-':
+                case L':':
+                case L'!':
                 case L'=':
                     if (last_char == L'+'){
-                        assignment_flush_helper(TK_OP_SELF_INCREMENT);
+                        ASSIGNMENT_FLUSH_HELPER(TK_OP_SELF_INCREMENT);
                         break;
                     } else if (last_char == L'-'){
-                        assignment_flush_helper(TK_OP_SELF_DECREMENT);
+                        ASSIGNMENT_FLUSH_HELPER(TK_OP_SELF_DECREMENT);
                         break;
                     } else if (last_char == L'='){
-                        assignment_flush_helper(TK_OP_EQUALITY);
+                        ASSIGNMENT_FLUSH_HELPER(TK_OP_EQUALITY);
+                        break;
+                    } else if (last_char == L':'){
+                        ASSIGNMENT_FLUSH_HELPER(TK_OP_TYPE_DEDUCED_ASSIGN);
                         break;
                     } else if (last_char == L'<'){
-                        assignment_flush_helper(TK_OP_LOWER_OR_EQUAL);
+                        ASSIGNMENT_FLUSH_HELPER(TK_OP_LOWER_OR_EQUAL);
                         break;
                     } else if (last_char == L'>'){
-                        assignment_flush_helper(TK_OP_HIGHER_OR_EQUAL);
+                        ASSIGNMENT_FLUSH_HELPER(TK_OP_HIGHER_OR_EQUAL);
+                        break;
+                    } else if (last_char == L'!'){
+                        ASSIGNMENT_FLUSH_HELPER(TK_OP_DIFFERENTIAL);
                         break;
                     } else if (!buffer.empty()){
-                        if (err) *err = {LE_INVALID_OPERATOR_PLACEMENT, current_line, current_column};
-                        return;
+                        if (buffer == "!") THROW_LEX_ERR(LE_INVALID_OPERATOR_PLACEMENT);
+                        auto type = get_operators_map().exists(buffer) ? get_operators_map()[buffer] : TK_IDENTIFIER;
+                        flush_lexeme_detailed(buffer, last_line, current_column_cursor, type);
+                        last_char = 0;
+                        buffer = "";
+                        // No break
                     }
                     goto append_character;
                 case L'>':
@@ -121,31 +147,30 @@ NexusLexer::LexicalError NexusLexer::tokenize_text(const VString &text) {
                     if (buffer.length() == 0) current_column_cursor = last_column + i;
             }
         }
+#undef ASSIGNMENT_FLUSH_HELPER
         if (!buffer.empty()){
-            if (buffer.length() > 1)
-                flush_lexeme_detailed(buffer, last_line, current_column_cursor);
-            else {
-                TokenType type;
-                switch (buffer[0]) {
-                    case L'+': type = TK_OP_ADD; break;
-                    case L'-': type = TK_OP_SUBTRACT; break;
-                    case L'=': type = TK_OP_ASSIGN; break;
-                    case L'>': type = TK_OP_HIGHER; break;
-                    case L'<': type = TK_OP_LOWER; break;
-                    default: type = TK_IDENTIFIER;
-                }
-                flush_lexeme_detailed(buffer, last_line, current_column_cursor, type);
-            }
+            if (buffer == "!") THROW_LEX_ERR(LE_INVALID_OPERATOR_PLACEMENT);
+            auto type = get_operators_map().exists(buffer) ? get_operators_map()[buffer] : TK_IDENTIFIER;
+            flush_lexeme_detailed(buffer, last_line, current_column_cursor, type);
         }
         current_lexeme = "";
         record_coordinate();
     };
+#undef THROW_LEX_ERR
 
     for (size_t i = 0, s = text.length(); i < s; i++, current_column++){
         const auto& curr_char = text[i];
         auto mapped_type = get_tokens_map().exists(curr_char) ?
                            get_tokens_map()[curr_char] : TK_CHARACTER;
         switch (mapped_type) {
+            case TK_FO_BACK_QUOTE:
+            case TK_FO_TILDA:
+            case TK_FO_AT:
+            case TK_FO_HASH:
+            case TK_FO_DOLLAR: if (!punctuations.empty()){
+                if (punctuations.peek_last() == TK_PU_DOUBLE_QUOTE) goto continue_as_usual;
+                else return {LE_INVALID_CHARACTER, current_line, current_column};
+            } else return {LE_INVALID_CHARACTER, current_line, current_column};
             case TK_EOL:{
                 if (!punctuations.empty()){
                     auto sample = punctuations.peek_last();
@@ -153,15 +178,14 @@ NexusLexer::LexicalError NexusLexer::tokenize_text(const VString &text) {
                         return {LE_UNEXPECTED_LINE_BREAK, current_line, current_column};
                 }
                 current_line++;
-                current_column = 1;
+                current_column = 0;
                 // No break here
             }
             case TK_SPACE:
             case TK_TAB: if ((punctuations.empty() || punctuations.peek_last() != TK_PU_DOUBLE_QUOTE) && current_lexeme.empty()) break;
             case TK_DE_SEMICOLON:
             case TK_DE_COMMA:
-            case TK_DE_DOT:
-            case TK_DE_COLON: if (punctuations.empty() || punctuations.peek_last() != TK_PU_DOUBLE_QUOTE || mapped_type == TK_EOL) {
+            case TK_DE_DOT: if (punctuations.empty() || punctuations.peek_last() != TK_PU_DOUBLE_QUOTE || mapped_type == TK_EOL) {
                 FLUSH_LEXEME();
                 if (!(mapped_type >= TK_EOF && mapped_type <= TK_EOL))
                     tokens.push_back(Token(mapped_type, VString(curr_char),
@@ -246,5 +270,24 @@ NexusLexer::LexicalError NexusLexer::tokenize_text(const VString &text) {
         }
     }
 #undef FLUSH_LEXEME
+    tokens.push_back({TK_EOF, "<EOF>", current_line, current_column});
+
     return {LE_NONE, 0, 0};
+}
+
+HashMap<VString, NexusLexer::TokenType, 64> *NexusLexer::allocate_operators_map() {
+    auto map = new HashMap<VString, NexusLexer::TokenType, 64>();
+    map->operator[]("+") = NexusLexer::TK_OP_ADD;
+    map->operator[]("+=") = NexusLexer::TK_OP_SELF_INCREMENT;
+    map->operator[]("-") = NexusLexer::TK_OP_SUBTRACT;
+    map->operator[]("-=") = NexusLexer::TK_OP_SELF_DECREMENT;
+    map->operator[]("=") = NexusLexer::TK_OP_ASSIGN;
+    map->operator[](":") = NexusLexer::TK_OP_TYPE_DECLARATION;
+    map->operator[](":=") = NexusLexer::TK_OP_TYPE_DEDUCED_ASSIGN;
+    map->operator[]("==") = NexusLexer::TK_OP_EQUALITY;
+    map->operator[]("<") = NexusLexer::TK_OP_LOWER;
+    map->operator[]("<=") = NexusLexer::TK_OP_LOWER_OR_EQUAL;
+    map->operator[](">") = NexusLexer::TK_OP_HIGHER;
+    map->operator[](">=") = NexusLexer::TK_OP_HIGHER_OR_EQUAL;
+    return map;
 }

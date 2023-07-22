@@ -9,6 +9,19 @@
 #include <type_traits>
 #include "memf.h"
 
+// Stolen from Godot
+#ifndef SWAP
+
+#define SWAP(m_x, m_y) __swap_tmpl((m_x), (m_y))
+template <class T>
+inline void __swap_tmpl(T &x, T &y) {
+    T aux = x;
+    x = y;
+    y = aux;
+}
+
+#endif
+
 // Should always inline no matter what.
 #ifndef _ALWAYS_INLINE_
 #if defined(__GNUC__)
@@ -36,13 +49,17 @@
 #define _NO_DISCARD_ [[nodiscard]]
 #endif
 
-// In some cases _NO_DISCARD_ will get false positives,
+// In some cases _NO_DISCARD_ will get_instance false positives,
 // we can prevent the warning in specific cases by preceding the call with a cast.
 #ifndef _ALLOW_DISCARD_
 #define _ALLOW_DISCARD_ (void)
 #endif
 
-static _FORCE_INLINE_ size_t strlen(const char* p_str){
+#define GUARD(lock_by_reference) LockGuard __guard(lock_by_reference)
+#define R_GUARD(lock_by_reference) ReadLockGuard __guard(lock_by_reference)
+#define W_GUARD(lock_by_reference) WriteLockGuard __guard(lock_by_reference)
+
+static _FORCE_INLINE_ size_t string_length(const char* p_str){
     size_t re = 0;
     for (;;re++){
         if (p_str[re] == 0) break;

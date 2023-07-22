@@ -22,9 +22,4 @@ struct StandardComparator {
     }
 };
 
-template <class T>
-struct DifferentialComparator {
-    _ALWAYS_INLINE_ bool operator()(const T &p_a, const T &p_b) const { return (p_a < p_b); }
-};
-
 #endif //NEXUS_COMPARATOR_H

@@ -4,6 +4,10 @@
 #include "vstring.h"
 #include "../hashfuncs.h"
 
+VString itos(int64_t p_val) {
+    return VString::num_int64(p_val);
+}
+
 uint32_t VString::hash_u32() const {
     return StandardHasher::hash(*this);
 }
@@ -75,16 +79,11 @@ bool VString::parse_utf8(const char *p_utf8, int p_len, const bool& p_skip_cr) {
                     skip = 5;
                     // invalid character, too long to encode as surrogates.
                 } else {
-                    // TODO: Implement error
-//                    _UNICERROR("invalid skip");
-                    return true; //invalid utf8
+                    throw VStringException("Invalid skip");
                 }
 
                 if (skip == 1 && (c & 0x1E) == 0) {
-                    //printf("overlong rejected\n");
-                    // TODO: Implement error
-//                    _UNICERROR("overlong rejected");
-                    return true; //reject overlong
+                    throw VStringException("Overlong rejected");
                 }
 
                 str_size++;
@@ -98,9 +97,7 @@ bool VString::parse_utf8(const char *p_utf8, int p_len, const bool& p_skip_cr) {
         }
 
         if (skip) {
-            // TODO: Implement error
-//            _UNICERROR("no space left");
-            return true; //not enough spac
+            throw VStringException("No space left");
         }
     }
 
@@ -135,26 +132,20 @@ bool VString::parse_utf8(const char *p_utf8, int p_len, const bool& p_skip_cr) {
         } else if ((*p_utf8 & 0xFE) == 0xFC) {
             len = 6;
         } else {
-            // TODO: Implement error
-//            _UNICERROR("invalid len");
+            throw VStringException("Invalid len");
 
             return true; //invalid UTF8
         }
 
         if (len > cstr_size) {
-            // TODO: Implement error
-//            _UNICERROR("no space left");
-            return true; //not enough space
+            throw VStringException("No space left");
         }
 
         if (len == 2 && (*p_utf8 & 0x1E) == 0) {
-            //printf("overlong rejected\n");
-            // TODO: Implement error
-//            _UNICERROR("no space left");
-            return true; //reject overlong
+            throw VStringException("No space left");
         }
 
-        /* Convert the first character */
+        /* Convert the first_ptr character */
 
         uint32_t unichar = 0;
 
@@ -165,14 +156,10 @@ bool VString::parse_utf8(const char *p_utf8, int p_len, const bool& p_skip_cr) {
 
             for (int i = 1; i < len; i++) {
                 if ((p_utf8[i] & 0xC0) != 0x80) {
-                    // TODO: Implement error
-//                    _UNICERROR("invalid utf8");
-                    return true; //invalid utf8
+                    throw VStringException("Invalid utf8");
                 }
                 if (unichar == 0 && i == 2 && ((p_utf8[i] & 0x7F) >> (7 - len)) == 0) {
-                    // TODO: Implement error
-//                    _UNICERROR("invalid utf8 overlong");
-                    return true; //no overlong
+                    throw VStringException("Invalid utf8 overlong");
                 }
                 unichar = (unichar << 6) | (p_utf8[i] & 0x3F);
             }
@@ -221,7 +208,7 @@ void VString::copy_from(const char *p_source) {
         return;
     }
 
-    const size_t len = strlen(p_source);
+    const size_t len = string_length(p_source);
 
     if (len == 0) {
         resize(0);
@@ -246,14 +233,15 @@ void VString::copy_from_unchecked(const wchar_t *p_char, const int &p_length) {
 }
 
 std::wostream &operator<<(std::wostream &p_ostream, const VString &p_vstring) {
+    if (p_vstring.ptr() == nullptr) return p_ostream;
     p_ostream << p_vstring.ptr();
     return p_ostream;
 }
 
-void VString::utf8(char **p_out_str) const {
+CharString VString::utf8() const {
     auto l = length();
     if (!l) {
-        return;
+        return {};
     }
 
     const wchar_t *d = &operator[](0);
@@ -286,12 +274,17 @@ void VString::utf8(char **p_out_str) const {
             fl += 6;
         }
     }
+
+    CharString utf8s;
     if (fl == 0) {
-        return;
+        return utf8s;
     }
-    *p_out_str = (char*)malloc(sizeof(char) * (fl + 1));
-    uint8_t * cdst = (uint8_t*)(*p_out_str);
+
+    utf8s.resize(fl + 1);
+    uint8_t *cdst = (uint8_t *)utf8s.c_str();
+
 #define APPEND_CHAR(m_c) *(cdst++) = m_c
+
     for (int i = 0; i < l; i++) {
         uint32_t c = d[i];
         if ((c & 0xfffffc00) == 0xd800) { // decode surrogate pair.
@@ -343,13 +336,12 @@ void VString::utf8(char **p_out_str) const {
     }
 #undef APPEND_CHAR
     *cdst = 0; //trailing zero
+
+    return utf8s;
 }
 
 std::ostream &operator<<(std::ostream &p_ostream, const VString &p_vstring) {
-    char* as_char_array;
-    p_vstring.utf8(&as_char_array);
-    p_ostream << as_char_array;
-    free(as_char_array);
+    p_ostream << p_vstring.utf8();
     return p_ostream;
 }
 
@@ -364,4 +356,273 @@ void VString::operator+=(const char &p_other) {
 
 void VString::operator+=(const wchar_t &p_other) {
     *this += VString(p_other);
+}
+
+bool VString::is_network_share_path() const {
+    return begins_with("//") || begins_with("\\\\");
+}
+
+VString VString::get_base_dir() const {
+    int end = 0;
+
+    // URL scheme style base.
+    auto basepos = find("://");
+    if (basepos != -1) {
+        end = basepos + 3;
+    }
+
+    // Windows top level directory base.
+    if (end == 0) {
+        basepos = find(":/");
+        if (basepos == -1) {
+            basepos = find(":\\");
+        }
+        if (basepos != -1) {
+            end = basepos + 2;
+        }
+    }
+
+    // Windows UNC network share path.
+    if (end == 0) {
+        if (is_network_share_path()) {
+            basepos = find("/", 2);
+            if (basepos == -1) {
+                basepos = find("\\", 2);
+            }
+            auto servpos = find("/", basepos + 1);
+            if (servpos == -1) {
+                servpos = find("\\", basepos + 1);
+            }
+            if (servpos != -1) {
+                end = servpos + 1;
+            }
+        }
+    }
+
+    // Unix root directory base.
+    if (end == 0) {
+        if (begins_with("/")) {
+            end = 1;
+        }
+    }
+
+    VString rs;
+    VString base;
+    if (end != 0) {
+        rs = substr(end, length());
+        base = substr(0, end);
+    } else {
+        rs = *this;
+    }
+
+    int sep = MAX(rs.rfind("/"), rs.rfind("\\"));
+    if (sep == -1) {
+        return base;
+    }
+
+    return base + rs.substr(0, sep);
+}
+
+int64_t VString::find(const char *p_str, int64_t p_from) const {
+    if (p_from < 0) {
+        return -1;
+    }
+
+    const size_t len = length();
+
+    if (len == 0) {
+        return -1; // won't find anything!
+    }
+
+    const wchar_t *src = c_str();
+
+    int src_len = 0;
+    while (p_str[src_len] != '\0') {
+        src_len++;
+    }
+
+    if (src_len == 1) {
+        const char needle = p_str[0];
+
+        for (int64_t i = p_from; i < len; i++) {
+            if (src[i] == needle) {
+                return i;
+            }
+        }
+
+    } else {
+        for (int64_t i = p_from; i <= (len - src_len); i++) {
+            bool found = true;
+            for (int j = 0; j < src_len; j++) {
+                int read_pos = i + j;
+
+                if (read_pos >= len) {
+                    throw VStringException("read_pos >= len");
+                    return -1;
+                };
+
+                if (src[read_pos] != p_str[j]) {
+                    found = false;
+                    break;
+                }
+            }
+
+            if (found) {
+                return i;
+            }
+        }
+    }
+
+    return -1;
+}
+bool VString::begins_with(const VString &p_string) const {
+    auto l = p_string.length();
+    if (l > length()) {
+        return false;
+    }
+
+    if (l == 0) {
+        return true;
+    }
+
+    const auto *p = &p_string[0];
+    const auto *s = &operator[](0);
+
+    for (int i = 0; i < l; i++) {
+        if (p[i] != s[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+VString VString::substr(int64_t p_from, int64_t p_chars) const {
+    if (p_chars == -1) {
+        p_chars = (int64_t)length() - p_from;
+    }
+
+    if (empty() || p_from < 0 || p_from >= length() || p_chars <= 0) {
+        return "";
+    }
+
+    if ((p_from + p_chars) > length()) {
+        p_chars = (int64_t)length() - p_from;
+    }
+
+    if (p_from == 0 && p_chars >= length()) {
+        return {*this};
+    }
+
+    VString s{};
+    s.copy_from_unchecked(&c_str()[p_from], p_chars);
+    return s;
+}
+
+int64_t VString::rfind(const VString& p_str, int64_t p_from) const {
+    // establish a limit
+    auto limit = int64_t(length() - p_str.length());
+    if (limit < 0) {
+        return -1;
+    }
+
+    // establish a starting point
+    if (p_from < 0) {
+        p_from = limit;
+    } else if (p_from > limit) {
+        p_from = limit;
+    }
+
+    auto src_len = p_str.length();
+    auto len = length();
+
+    if (src_len == 0 || len == 0) {
+        return -1; // won't find anything!
+    }
+
+    const auto *src = c_str();
+
+    for (int64_t i = p_from; i >= 0; i--) {
+        bool found = true;
+        for (int j = 0; j < src_len; j++) {
+            int read_pos = i + j;
+
+            if (read_pos >= len) {
+                throw VStringException("read_pos >= len");
+            };
+
+            if (src[read_pos] != p_str[j]) {
+                found = false;
+                break;
+            }
+        }
+
+        if (found) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+VString VString::replace(const char *p_key, const char *p_with) const{
+    VString new_string;
+    int64_t search_from = 0;
+    int64_t result = 0;
+
+    while ((result = find(p_key, search_from)) >= 0) {
+        new_string += substr(search_from, result - search_from);
+        new_string += p_with;
+        int k = 0;
+        while (p_key[k] != '\0') {
+            k++;
+        }
+        search_from = result + k;
+    }
+
+    if (search_from == 0) {
+        return *this;
+    }
+
+    new_string += substr(search_from, int64_t(length()) - search_from);
+
+    return new_string;
+}
+
+VString VString::num_int64(int64_t p_num, int base, bool capitalize_hex) {
+    bool sign = p_num < 0;
+
+    int64_t n = p_num;
+
+    int chars = 0;
+    do {
+        n /= base;
+        chars++;
+    } while (n);
+
+    if (sign) {
+        chars++;
+    }
+    VString s;
+    s.resize(chars + 1);
+    auto *c = s.ptrw();
+    c[chars] = 0;
+    n = p_num;
+    do {
+        int mod = ABS(n % base);
+        if (mod >= 10) {
+            char a = (capitalize_hex ? 'A' : 'a');
+            c[--chars] = a + (mod - 10);
+        } else {
+            c[--chars] = '0' + mod;
+        }
+
+        n /= base;
+    } while (n);
+
+    if (sign) {
+        c[0] = '-';
+    }
+
+    return s;
 }

@@ -5,15 +5,16 @@
 #ifndef NEXUS_LEXER_H
 #define NEXUS_LEXER_H
 
-#include "../types/vstring.h"
-#include "../types/vector.h"
-#include "../types/hashmap.h"
+#include "../core/types/vstring.h"
+#include "../core/types/vector.h"
+#include "../core/types/hashmap.h"
 
 class NexusLexer {
 public:
     enum TokenType : unsigned int {
         TK_EMPTY,
         TK_CHARACTER,
+        TK_STRING,
         TK_IDENTIFIER,
         TK_NUMBER,
         TK_CONSTANT,
@@ -29,7 +30,6 @@ public:
         TK_DE_SEMICOLON,
         TK_DE_COMMA,
         TK_DE_DOT,
-        TK_DE_COLON,
         TK_DE_CHAR_ESCAPE,
         // Operators
         TK_OP_ADD,
@@ -37,11 +37,20 @@ public:
         TK_OP_SUBTRACT,
         TK_OP_SELF_DECREMENT,
         TK_OP_ASSIGN,
+        TK_OP_TYPE_DECLARATION,
+        TK_OP_TYPE_DEDUCED_ASSIGN,
         TK_OP_EQUALITY,
+        TK_OP_DIFFERENTIAL,
         TK_OP_LOWER,
         TK_OP_LOWER_OR_EQUAL,
         TK_OP_HIGHER,
         TK_OP_HIGHER_OR_EQUAL,
+        // Forbidden
+        TK_FO_BACK_QUOTE,
+        TK_FO_TILDA,
+        TK_FO_AT,
+        TK_FO_HASH,
+        TK_FO_DOLLAR,
         // Punctuation
         TK_PU_QUOTE,
         TK_PU_DOUBLE_QUOTE,
@@ -72,6 +81,7 @@ public:
         LE_INVALID_STRING_ESCAPE_PLACEMENT,
         LE_INVALID_ESCAPE_SEQUENCE_PLACEMENT,
         LE_INVALID_OPERATOR_PLACEMENT,
+        LE_INVALID_CHARACTER,
         LE_MAX,
     };
     struct LexicalError {
@@ -88,6 +98,7 @@ public:
 private:
     static const char token_characters[TK_MAX];
     static HashMap<wchar_t, TokenType, 512>* tokens_map;
+    static HashMap<VString, TokenType, 64>* operators_map;
 
     Vector<Token> tokens{};
 
@@ -98,15 +109,20 @@ private:
         }
         return map;
     }
+    static HashMap<VString, NexusLexer::TokenType, 64>* allocate_operators_map();
 public:
     static _FORCE_INLINE_ const HashMap<wchar_t, TokenType, 512>& get_tokens_map() { return *tokens_map; }
+    static _FORCE_INLINE_ const HashMap<VString, NexusLexer::TokenType, 64>& get_operators_map() { return *operators_map; }
 
     _FORCE_INLINE_ void clear_tokens() { tokens.clear(); }
     _NO_DISCARD_ _FORCE_INLINE_ const Vector<Token>& extract_tokens() const { return tokens; }
     LexicalError tokenize_text(const VString& text);
 
     NexusLexer(){
-        if (tokens_map == nullptr) tokens_map = allocate_tokens_map();
+        if (tokens_map == nullptr)
+            tokens_map = allocate_tokens_map();
+        if (operators_map == nullptr)
+            operators_map = allocate_operators_map();
     }
 };
 

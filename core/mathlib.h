@@ -25,6 +25,18 @@ public:
         return std::isnan(p_val);
 #endif
     }
+
+    template<typename T>
+    static _ALWAYS_INLINE_ T max(const T& p_left, const T& p_right){
+        return p_left > p_right ? p_left : p_right;
+    }
+    template<typename T>
+    static _ALWAYS_INLINE_ T abs(const T& p_val){
+        return p_val > 0 ? p_val : -p_val;
+    }
 };
+
+#define MAX(m_a, m_b) Math::max(m_a, m_b)
+#define ABS(m_val) Math::abs(m_val)
 
 #endif //NEXUS_MATHLIB_H
