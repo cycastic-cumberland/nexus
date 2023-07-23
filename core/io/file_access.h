@@ -77,6 +77,7 @@ public:
 
     virtual bool get_endian_mode() const { return endian_swap; }
     virtual void set_endian_mode(const bool& p_endian) { endian_swap = p_endian; }
+    virtual FileAccess* duplicate() const = 0;
 
     virtual size_t get_pos() const = 0;
     virtual size_t get_file_size() const = 0;

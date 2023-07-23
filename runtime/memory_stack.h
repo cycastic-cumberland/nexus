@@ -5,10 +5,12 @@
 #ifndef NEXUS_MEMORY_STACK_H
 #define NEXUS_MEMORY_STACK_H
 
-#include "runtime_global_settings.h"
+#include "ambigous_value.h"
 #include "../language/bytecode.h"
 #include "../core/types/vector.h"
 #include "../core/types/stack.h"
+
+struct StackStructMetadata;
 
 class MemoryStackException : public Exception {
 public:
@@ -21,6 +23,8 @@ public:
     struct StackItem {
         NexusSerializedBytecode::DataType type;
         void* data;
+
+        _NO_DISCARD_ AmbiguousValue to_ambiguous() const { return {const_cast<StackItem*>(this)->data, type}; }
     };
     struct StackFrame {
         uint32_t objects_count_offset;
@@ -44,6 +48,7 @@ private:
         stack_objects_size += sizeof(T);
         new (&stack_location[current_offset]) T(p_data);
     }
+    void push_ambiguous(const AmbiguousValue& p_ambiguous);
 
     template<class T>
     _FORCE_INLINE_ void object_destroy(const size_t& p_obj_offset){
@@ -57,56 +62,19 @@ private:
     }
 public:
     _NO_DISCARD_ _FORCE_INLINE_ size_t data_size() const { return stack_objects_size; }
-    _NO_DISCARD_ _FORCE_INLINE_ uint32_t count() const { return stack_objects_count; }
-    _NO_DISCARD_ _FORCE_INLINE_ bool empty() const { return count() == 0; }
-    _NO_DISCARD_ _FORCE_INLINE_ StackItem get_top() const {
+    _NO_DISCARD_ _FORCE_INLINE_ uint32_t objects_count() const { return stack_objects_count; }
+    _NO_DISCARD_ _FORCE_INLINE_ bool empty() const { return objects_count() == 0; }
+    _NO_DISCARD_ _FORCE_INLINE_ StackItem free_probe(const size_t& p_absolute_pos) const {
         return StackItem {
-                .type = stack_objects_data_type.last(),
-                .data = &stack_location[stack_objects_offset.last()]
+                .type = stack_objects_data_type[p_absolute_pos],
+                .data = &stack_location[stack_objects_offset[p_absolute_pos]]
         };
     }
-    _FORCE_INLINE_ void pop(){
-        if (empty()) throw MemoryStackException("No object to pop");
-        // Destroy object
-        auto obj_type = stack_objects_data_type.last();
-        auto obj_offset = stack_objects_offset.last();
-        stack_objects_data_type.pop_back();
-        stack_objects_offset.pop_back();
-        stack_objects_count--;
-        switch (obj_type) {
-            case NexusSerializedBytecode::UNSIGNED_32_BIT_INTEGER:
-            case NexusSerializedBytecode::SIGNED_32_BIT_INTEGER:
-                stack_objects_size -= sizeof(uint32_t);
-                break;
-            case NexusSerializedBytecode::UNSIGNED_64_BIT_INTEGER:
-            case NexusSerializedBytecode::SIGNED_64_BIT_INTEGER:
-                stack_objects_size -= sizeof(uint64_t);
-                break;
-            case NexusSerializedBytecode::SINGLE_PRECISION_FLOATING_POINT:
-                stack_objects_size -= sizeof(float);
-                break;
-            case NexusSerializedBytecode::DOUBLE_PRECISION_FLOATING_POINT:
-                stack_objects_size -= sizeof(double);
-                break;
-            case NexusSerializedBytecode::STRING: {
-                object_destroy<VString>(obj_offset);
-                break;
-            }
-            case NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT: {
-                object_destroy<Ref<Object>>(obj_offset);
-                break;
-            }
-            case NexusSerializedBytecode::VOID:
-            case NexusSerializedBytecode::STRING_LITERAL:
-            case NexusSerializedBytecode::METHOD:
-            case NexusSerializedBytecode::NONE:
-                throw MemoryStackException(CharString("Destructor not found for type: ") + itos(obj_type).utf8());
-        }
-    }
+    void pop();
 private:
     _FORCE_INLINE_ void recline(const uint32_t& p_to_size){
-        if (p_to_size <= stack_objects_size) return;
-        while (stack_objects_size > p_to_size){
+        if (p_to_size > stack_objects_count) return;
+        while (stack_objects_count > p_to_size){
             pop();
         }
     }
@@ -128,6 +96,16 @@ public:
         auto frame = stack_frames.pop();
         recline(frame.objects_count_offset);
     }
+    _NO_DISCARD_ _FORCE_INLINE_ uint32_t allocated_objects_in_this_frame() const {
+        if (stack_frames.empty()) return 0;
+        return stack_objects_count - stack_frames.peek_last().objects_count_offset;
+    }
+    _NO_DISCARD_ _FORCE_INLINE_ uint32_t get_stack_frames_count() const {
+        return stack_frames.size();
+    }
+    _NO_DISCARD_ _FORCE_INLINE_ bool empty_stack() const {
+        return allocated_objects_in_this_frame() == 0;
+    }
     MemoryStack(){
         stack_location = (uint8_t *)malloc(NexusRuntimeGlobalSettings::get_settings().stack_size);
         stack_objects_data_type = Vector<NexusSerializedBytecode::DataType>();
@@ -136,6 +114,9 @@ public:
         stack_objects_count = 0;
         stack_objects_size = 0;
         allocate_stack_frame();
+    }
+    _FORCE_INLINE_ void push(const AmbiguousValue& p_ambiguous){
+        push_ambiguous(p_ambiguous);
     }
     _FORCE_INLINE_ void push(const uint32_t& p_data){
         push(p_data, NexusSerializedBytecode::UNSIGNED_32_BIT_INTEGER);
@@ -161,77 +142,31 @@ public:
     _FORCE_INLINE_ void push(const Ref<Object>& p_data){
         push(p_data, NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT);
     }
+    _NO_DISCARD_ _FORCE_INLINE_ StackItem get_top() const {
+        const auto& last_frame = stack_frames.peek_last();
+        if (last_frame.objects_count_offset == stack_objects_count)
+            throw MemoryStackException("No value at top");
+        return free_probe(stack_objects_count - 1);
+    }
+    _NO_DISCARD_ _FORCE_INLINE_ StackItem get_at(const int32_t& p_relative_pos) const {
+        const auto& last_frame = stack_frames.peek_last();
+        auto absolute = p_relative_pos >= 0 ?
+                        int32_t(last_frame.objects_count_offset) + p_relative_pos :
+                        int32_t(stack_objects_count) + p_relative_pos;
+        if (last_frame.objects_count_offset > absolute || absolute > stack_objects_count)
+            throw MemoryStackException("Invalid stack index");
+        return free_probe(absolute);
+    }
     _FORCE_INLINE_ void duplicate_top(){
-        auto top = get_top();
-        switch (top.type) {
-            case NexusSerializedBytecode::UNSIGNED_32_BIT_INTEGER:
-                push(*(uint32_t*)top.data);
-                break;
-            case NexusSerializedBytecode::SIGNED_32_BIT_INTEGER:
-                push(*(int32_t*)top.data);
-                break;
-            case NexusSerializedBytecode::UNSIGNED_64_BIT_INTEGER:
-                push(*(uint64_t*)top.data);
-                break;
-            case NexusSerializedBytecode::SIGNED_64_BIT_INTEGER:
-                push(*(int64_t*)top.data);
-                break;
-            case NexusSerializedBytecode::SINGLE_PRECISION_FLOATING_POINT:
-                push(*(float*)top.data);
-                break;
-            case NexusSerializedBytecode::DOUBLE_PRECISION_FLOATING_POINT:
-                push(*(double*)top.data);
-                break;
-            case NexusSerializedBytecode::STRING:
-                push(*(VString*)top.data);
-                break;
-            case NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT:
-                push(*(Ref<Object>*)top.data);
-                break;
-            case NexusSerializedBytecode::VOID:
-            case NexusSerializedBytecode::STRING_LITERAL:
-            case NexusSerializedBytecode::METHOD:
-            case NexusSerializedBytecode::NONE:
-                throw MemoryStackException(CharString("Cannot push object of unsupported type: ") + itos(top.type).utf8());
-        }
+        auto top = get_top().to_ambiguous();
+        push(top);
     }
-    _FORCE_INLINE_ void set_object(const uint32_t& p_idx, const void* p_item){
-        if (count() <= p_idx) throw MemoryStackException(CharString("Invalid index: ") + itos(p_idx).utf8());
-        auto obj_type = stack_objects_data_type[p_idx];
-        auto obj_loc = stack_objects_offset[p_idx];
-        switch (obj_type) {
-            case NexusSerializedBytecode::UNSIGNED_32_BIT_INTEGER:
-                set_object<uint32_t>(obj_loc, p_item);
-                break;
-            case NexusSerializedBytecode::SIGNED_32_BIT_INTEGER:
-                set_object<int32_t>(obj_loc, p_item);
-                break;
-            case NexusSerializedBytecode::UNSIGNED_64_BIT_INTEGER:
-                set_object<uint64_t>(obj_loc, p_item);
-                break;
-            case NexusSerializedBytecode::SIGNED_64_BIT_INTEGER:
-                set_object<int64_t>(obj_loc, p_item);
-                break;
-            case NexusSerializedBytecode::SINGLE_PRECISION_FLOATING_POINT:
-                set_object<float>(obj_loc, p_item);
-                break;
-            case NexusSerializedBytecode::DOUBLE_PRECISION_FLOATING_POINT:
-                set_object<double>(obj_loc, p_item);
-                break;
-            case NexusSerializedBytecode::STRING:
-                set_object<VString>(obj_loc, p_item);
-                break;
-            case NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT:
-            // TODO: Actually run type check
-                set_object<Ref<Object>>(obj_loc, p_item);
-                break;
-            case NexusSerializedBytecode::VOID:
-            case NexusSerializedBytecode::METHOD:
-            case NexusSerializedBytecode::STRING_LITERAL:
-            case NexusSerializedBytecode::NONE:
-                throw MemoryStackException("This should not happen???");
-        }
+    _FORCE_INLINE_ void copy_to_top(const int32_t& p_relative_pos){
+        auto item = get_at(p_relative_pos).to_ambiguous();
+        push(item);
     }
+    void set_object(const int32_t& p_relative_idx, const AmbiguousValue& p_ambiguous);
+    void set_object(const int32_t& p_relative_idx, const void* p_item);
     ~MemoryStack() {
         clear();
         free(stack_location);

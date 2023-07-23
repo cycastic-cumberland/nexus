@@ -6,7 +6,7 @@
 #define NEXUS_COW_H
 
 #include "safe_refcount.h"
-#include "lock.h"
+#include "../lock.h"
 
 template <typename T>
 class CowArray {
@@ -27,7 +27,7 @@ private:
         }
     }
     void ref(CowData* p_data){
-        // Does not lock
+        // Does not rwlock
         if (p_data == cow_data) return;
         unref();
         cow_data = p_data;

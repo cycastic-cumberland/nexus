@@ -5,13 +5,12 @@
 #ifndef NEXUS_OBJECT_H
 #define NEXUS_OBJECT_H
 
-#include "../typedefs.h"
 #include "safe_refcount.h"
+#include "../lock.h"
 #include "vector.h"
 #include "hashmap.h"
 #include "reference.h"
 
-class RWLock;
 class ObjectDB;
 
 class Object {

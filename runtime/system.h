@@ -5,6 +5,7 @@
 #ifndef NEXUS_SYSTEM_H
 #define NEXUS_SYSTEM_H
 
+#include <thread>
 #include "../core/typedefs.h"
 #include "../core/types/vstring.h"
 
@@ -29,6 +30,7 @@ public:
     virtual void get_dynamic_library_symbol_handle(void *p_library_handle, const CharString& p_name, void *&p_symbol_handle, const bool& p_optional = false){
         throw SystemException("Unavailable");
     }
+    virtual void yield() { std::this_thread::yield(); }
     virtual ~System() = default;
 };
 

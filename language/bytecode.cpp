@@ -4,6 +4,7 @@
 
 #include "Bytecode.h"
 #include "../core/types/stack.h"
+#include "../core/types/stack_struct.h"
 
 void NexusBytecode::load_header(const FilePointer &p_file) {
 #define COLLECT_CONSTANTS(collector, storage) {         \
@@ -24,9 +25,9 @@ void NexusBytecode::load_header(const FilePointer &p_file) {
 //    COLLECT_CONSTANTS(get_string, string_literals)
     // Read method metadata
     auto method_count = p_file->get_32();
-    methods_metadata = Vector<Ref<NexusMethodMetadata>>(method_count);
+    methods_metadata = Vector<Ref<NexusBytecodeMethodMetadata>>(method_count);
     for (int i = 0; i < method_count; i++){
-        methods_metadata.push_back(Ref<NexusMethodMetadata>::init());
+        methods_metadata.push_back(Ref<NexusBytecodeMethodMetadata>::init());
         methods_metadata[i]->deserialize(p_file);
     }
     // Reserved space
@@ -108,9 +109,16 @@ void NexusBytecodeRawInstruction::deserialize(const FilePointer& p_file) {
         auto arg_type = (NexusSerializedBytecode::DataType)p_file->get_8();
         NexusBytecodeArgument* argument = nullptr;
         switch (arg_type){
-            case VOID:
-                argument = new NexusBytecodeArgument();
+            case STACK_STRUCT: {
+                auto stack_struct_item_count = p_file->get_8();
+                Vector<Ref<NexusBytecodeArgument>> args = Vector<Ref<NexusBytecodeArgument>>(stack_struct_item_count);
+                for (uint8_t i = 0; i < stack_struct_item_count; i++){
+                    args.push_back(Ref<NexusBytecodeArgument>::make_ref());
+                    args[i]->type = (NexusSerializedBytecode::DataType)p_file->get_8();
+                }
+                argument = new NexusBytecodeArgument(new StackStructMetadata(args));
                 break;
+            }
             case UNSIGNED_32_BIT_INTEGER:
                 argument = new NexusBytecodeArgument(p_file->get_32());
                 break;
@@ -150,8 +158,14 @@ void NexusBytecodeRawInstruction::serialize(FilePointer& p_file) const {
         auto type = item->type;
         p_file->store_8((uint8_t)type);
         switch (type){
-            case VOID:
+            case STACK_STRUCT:{
+                const auto& as_ssm = item->get_data<StackStructMetadata>();
+                p_file->store_8(as_ssm.struct_metadata.size());
+                for (const auto& it : as_ssm.struct_metadata){
+                    p_file->store_8(it->type);
+                }
                 break;
+            }
             case UNSIGNED_32_BIT_INTEGER:
                 p_file->store_32(item->get_data<uint32_t>());
                 break;
@@ -183,7 +197,7 @@ void NexusBytecodeRawInstruction::serialize(FilePointer& p_file) const {
     }
 }
 
-void NexusBytecodeMethodBody::deserialize(const FilePointer& p_file){
+void NexusBytecodeMethodBody::read_header(const FilePointer &p_file) {
     method_name = p_file->get_string();
     auto argc = p_file->get_8();
     arguments = Vector<Ref<NexusBytecodeArgument>>(argc);
@@ -192,7 +206,7 @@ void NexusBytecodeMethodBody::deserialize(const FilePointer& p_file){
         Ref<NexusBytecodeArgument> arg = Ref<NexusBytecodeArgument>::make_ref(arg_type);
         arguments.push_back(arg);
     }
-    // Max possible value stored inside the stack
+    // Max possible value stored inside the stack1
     max_stack = p_file->get_16();
     auto locals_init_count = p_file->get_32();
     locals_init = Vector<Ref<NexusBytecodeArgument>>(locals_init_count);
@@ -203,9 +217,19 @@ void NexusBytecodeMethodBody::deserialize(const FilePointer& p_file){
     }
     auto instructions_count = p_file->get_32();
     instructions = Vector<Ref<NexusBytecodeRawInstruction>>(instructions_count);
-    for (uint32_t i = 0; i < instructions_count; i++){
-        Ref<NexusBytecodeRawInstruction> instruction = Ref<NexusBytecodeRawInstruction>::make_ref();
-        instruction->deserialize(p_file);
+}
+Ref<NexusBytecodeRawInstruction> NexusBytecodeMethodBody::read_next_instruction(const FilePointer &p_file) {
+    if (instruction_iter + 1 >= instructions.capacity()) return nullptr;
+    instruction_iter++;
+    Ref<NexusBytecodeRawInstruction> instruction = Ref<NexusBytecodeRawInstruction>::make_ref();
+    instruction->deserialize(p_file);
+    return instruction;
+}
+
+void NexusBytecodeMethodBody::deserialize(const FilePointer& p_file){
+    read_header(p_file);
+    Ref<NexusBytecodeRawInstruction> instruction = read_next_instruction(p_file);
+    while (instruction.is_valid()) {
         instructions.push_back(instruction);
     }
 }
@@ -225,3 +249,91 @@ void NexusBytecodeMethodBody::serialize(FilePointer& p_file) const {
         instruction->serialize(p_file);
     }
 }
+
+NexusBytecodeInstance::NexusBytecodeInstance(const FilePointer &p_fp, NexusBytecodeInstance::BytecodeLoadMode p_load_mode) {
+    load_mode = p_load_mode;
+    bytecode = Ref<NexusBytecode>::init();
+    // Does not duplicate
+    file_pointer = p_fp;
+    switch (load_mode) {
+        case LOAD_HEADER:
+        case LOAD_ALL:
+            bytecode->load_header(file_pointer);
+            header_end = (uint64_t)file_pointer->get_pos();
+            if (load_mode == LOAD_HEADER) {
+                bytecode->build_metadata_map();
+                break;
+            }
+            bytecode->load_methods_body(file_pointer);
+            bytecode->build_bodies_map();
+    }
+    // Get body offset to jump around file faster
+    // Method must not be external
+    for (const auto& method_metadata : bytecode->get_methods_metadata()){
+        if (!(method_metadata->attributes | NexusBytecodeMethodMetadata::MA_EXTERNAL) && method_metadata->method_body_offset != 0)
+            bodies_location[method_metadata->method_name] = method_metadata->method_body_offset;
+    }
+}
+
+NexusBytecodeInstance::NexusBytecodeInstance(const VString &p_bc_path,
+                                             NexusBytecodeInstance::BytecodeLoadMode p_load_mode) {
+    load_mode = p_load_mode;
+    bytecode = Ref<NexusBytecode>::init();
+    file_pointer = FileAccessServer::open(p_bc_path, FileAccess::ACCESS_READ, NexusRuntimeGlobalSettings::get_settings().bytecode_endian_mode);
+    if (!file_pointer->is_open()) throw BytecodeException(CharString("Failed to open bytecode: ") + p_bc_path.utf8());
+    switch (load_mode) {
+        case LOAD_HEADER:
+        case LOAD_ALL:
+            bytecode->load_header(file_pointer);
+            header_end = (uint64_t)file_pointer->get_pos();
+            if (load_mode == LOAD_HEADER) break;
+            bytecode->load_methods_body(file_pointer);
+    }
+    // Get body offset to jump around file faster
+    // Method must not be external
+    for (const auto& method_metadata : bytecode->get_methods_metadata()){
+        if (!(method_metadata->attributes | NexusBytecodeMethodMetadata::MA_EXTERNAL) && method_metadata->method_body_offset != 0)
+            bodies_location[method_metadata->method_name] = method_metadata->method_body_offset;
+    }
+}
+
+void NexusMethodPointerJIT::load_method(const Ref<NexusBytecodeInstance>& p_bci, const VString& p_method_name) {
+    file = FileAccessServer::duplicate_pointer(p_bci->file_pointer);
+    auto pos = p_bci->bodies_location[p_method_name];
+    file->seek(pos);
+    method_body = Ref<NexusBytecodeMethodBody>::make_ref();
+    method_body->read_header(file);
+    method_metadata = p_bci->bytecode->get_metadata_map()[method_body->method_name];
+}
+
+Ref<NexusBytecodeRawInstruction> NexusMethodPointerJIT::get_next_instruction() {
+    return method_body->read_next_instruction(file);
+}
+
+Ref<NexusBytecodeMethodMetadata> NexusMethodPointerJIT::get_method_metadata() const {
+    return method_metadata;
+}
+
+Vector<Ref<NexusBytecodeArgument>> NexusMethodPointerJIT::get_arguments() const {
+    return method_body->arguments;
+}
+
+void NexusMethodPointerMemory::load_method(const Ref<NexusBytecodeInstance>& p_bci, const VString& p_method_name){
+    method_body = p_bci->bytecode->get_bodies_map()[p_method_name];
+    method_metadata = p_bci->bytecode->get_metadata_map()[p_method_name];
+}
+
+Ref<NexusBytecodeRawInstruction> NexusMethodPointerMemory::get_next_instruction() {
+    instructions_iter++;
+    if (instructions_iter >= method_body->instructions.capacity()) return nullptr;
+    return method_body->instructions[instructions_iter];
+}
+
+Ref<NexusBytecodeMethodMetadata> NexusMethodPointerMemory::get_method_metadata() const {
+    return method_metadata;
+}
+
+Vector<Ref<NexusBytecodeArgument>> NexusMethodPointerMemory::get_arguments() const {
+    return method_body->arguments;
+}
+

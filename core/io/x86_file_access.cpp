@@ -28,6 +28,7 @@ void x86FileAccess::open(const VString &p_file_path, FileAccess::AccessType p_ac
         f.open(p_file_path.utf8().c_str(), std::ios::app | std::ios::binary);
     else throw FileException("Access type not supported");
     if (!is_open()) throw FileCannotBeOpenedException(VString("Cannot open file: ") + p_file_path);
+    file_path = p_file_path;
     access_type = p_access_type;
 }
 
@@ -37,7 +38,7 @@ size_t x86FileAccess::get_pos() const {
 
 size_t x86FileAccess::get_file_size() const {
     auto mutable_self = const_cast<x86FileAccess*>(this);
-    // Get the current data_size
+    // Get the current_callback data_size
     auto pos = mutable_self->get_pos();
     // Move toward the end
     mutable_self->f.seekg(0, std::ios_base::end);
@@ -77,4 +78,13 @@ void x86FileAccess::store_8(const uint8_t &p_data) {
     if (!is_open()) throw FileNotOpenedException();
     if (!(access_type & ACCESS_WRITE)) throw ReadViolationException("Write operation not permitted");
     f.put(*(char*)&p_data);
+}
+
+FileAccess *x86FileAccess::duplicate() const {
+    auto ptr = new x86FileAccess(access_type, get_endian_mode());
+    if (is_open()) {
+        ptr->open(get_absolute_path(), access_type);
+        ptr->seek(get_pos());
+    }
+    return ptr;
 }

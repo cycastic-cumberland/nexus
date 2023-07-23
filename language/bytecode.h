@@ -10,17 +10,27 @@
 #include "../core/types/char_string.h"
 #include "../core/exception.h"
 #include "../core/io/file_access_server.h"
+#include "../runtime/runtime_global_settings.h"
 
-class BytecodeParseException : public Exception {
+struct StackStructMetadata;
+
+class BytecodeException : public Exception {
 public:
 //    explicit BytecodeParseException(const CharString& message) : Exception(message) {}
-    explicit BytecodeParseException(const char* message) : Exception(message) {}
+    explicit BytecodeException(const char* message) : Exception(message) {}
+    explicit BytecodeException(const CharString& message) : Exception(message) {}
+};
+
+class BytecodeParseException : public BytecodeException {
+public:
+//    explicit BytecodeParseException(const CharString& message) : Exception(message) {}
+    explicit BytecodeParseException(const char* message) : BytecodeException(message) {}
 };
 
 struct NexusSerializedBytecode : public Object {
 public:
-    enum DataType : unsigned int {
-        VOID,
+    enum DataType : unsigned char {
+        STACK_STRUCT,
         UNSIGNED_32_BIT_INTEGER,
         SIGNED_32_BIT_INTEGER,
         UNSIGNED_64_BIT_INTEGER,
@@ -36,7 +46,7 @@ public:
     enum OpCode : unsigned short {
         // Unused/deleted instruction
         OPCODE_UNUSED,
-        // Load constant onto the stack
+        // Load constant onto the stack1
         // Argument: a constant (of suitable type)
         // Example (in CIL):
         //     IL_0005: ldc.i4       300 // 0x0000012c
@@ -46,7 +56,7 @@ public:
         OPCODE_LOAD_CONSTANT_U64,
         OPCODE_LOAD_CONSTANT_FP32,
         OPCODE_LOAD_CONSTANT_FP64,
-        // Copies the current topmost value on the evaluation stack, and then pushes the copy onto the evaluation stack.
+        // Copies the current_callback topmost value on the evaluation stack1, and then pushes the copy onto the evaluation stack1.
         OP_DUPLICATE,
         // Call a method
         // Argument: a string constant indicating method name
@@ -56,21 +66,21 @@ public:
         // Argument: a string constant indicating method name
         // Stack: -1: host object
         OP_CALL_VIRTUAL,
-        // Load an argument onto the stack
+        // Load an argument onto the stack1
         // Argument: unsigned 32-bit integer, indicating argument position
         OP_LOAD_ARG,
         // Replace the value of an argument.
         // Argument: unsigned 32-bit integer, indicating argument position
         // Stack: -1: value to be replaced with
         OP_STORE_ARG,
-        // Load an object from the stack, and push it on top
-        // Argument: unsigned 32-bit integer, indicating object position on the stack
+        // Load an object from the stack1, and push it on top
+        // Argument: unsigned 32-bit integer, indicating object position on the stack1
         OP_LOAD_STACK,
-        // Store a value to a stack object
-        // Argument: unsigned 32-bit integer, indicating object position on the stack.
+        // Store a value to a stack1 object
+        // Argument: unsigned 32-bit integer, indicating object position on the stack1.
         // Stack: -1: value to be replaced with
         OP_STORE_STACK,
-        // Load an object field onto the stack. If said field is not static, load an object pointer first
+        // Load an object field onto the stack1. If said field is not static, load an object pointer first
         // Argument: 0: field number (not data_size offset)
         // Stack: (OPTIONAL) -1: host object
         OP_LOAD_FIELD,
@@ -78,7 +88,7 @@ public:
         // Argument: 0: field number (not data_size offset)
         // Stack: -2: host object; -1: value to store
         OP_STORE_FIELD,
-        // Pop the topmost value of the stack
+        // Pop the topmost value of the stack1
         OP_POP,
         // Declare a label
         OP_LABEL_DECLARE,
@@ -87,11 +97,11 @@ public:
         // Goto a label
         // Argument: 0: label's name
         OP_GOTO,
-        // Goto a label if the condition is satisfied. Will trigger if stack No.-1 is not 0
+        // Goto a label if the condition is satisfied. Will trigger if stack1 No.-1 is not 0
         // Argument: 0: label's name
         // Stack: -1: unsigned 32-bit integer or equivalent
         OP_GOTO_IF_TRUE,
-        // Goto a label if the condition is unsatisfied. Will trigger if stack No.-1 is 0
+        // Goto a label if the condition is unsatisfied. Will trigger if stack1 No.-1 is 0
         // Argument: 0: label's name
         // Stack: -1: unsigned 32-bit integer or equivalent
         OP_GOTO_IF_FALSE,
@@ -100,16 +110,16 @@ public:
         //                              Operators                               //
         //--------------------------------------------------------------------- //
 
-        // Add two value from stack and push the result onto the stack. Can call overloaded method if necessary
+        // Add two value from stack1 and push the result onto the stack1. Can call overloaded method if necessary
         // Stack: -2: operand 1; -1: operand 2
         OP_ADD,
-        // Subtract two value from stack and push the result onto the stack. Can call overloaded method if necessary
+        // Subtract two value from stack1 and push the result onto the stack1. Can call overloaded method if necessary
         // Stack: -2: operand 1; -1: operand 2
         OP_SUBTRACT,
-        // Multiply two value from stack and push the result onto the stack. Can call overloaded method if necessary
+        // Multiply two value from stack1 and push the result onto the stack1. Can call overloaded method if necessary
         // Stack: -2: operand 1; -1: operand 2
         OP_MULTIPLY,
-        // Divide two value from stack and push the result onto the stack. Can call overloaded method if necessary
+        // Divide two value from stack1 and push the result onto the stack1. Can call overloaded method if necessary
         // Stack: -2: operand 1; -1: operand 2
         OP_DIVIDE,
         // Ceiling
@@ -140,7 +150,7 @@ struct NexusBytecodeMetadata : public NexusSerializedBytecode{
     }
 };
 
-struct NexusMethodMetadata : public NexusSerializedBytecode {
+struct NexusBytecodeMethodMetadata : public NexusSerializedBytecode {
     enum MethodAttribute : unsigned int {
         MA_NORMAL = 0,
         MA_EXTERNAL = 1,
@@ -189,7 +199,11 @@ struct NexusBytecodeArgument : public NexusSerializedBytecode {
         type = p_type;
         data = nullptr;
     }
-    _FORCE_INLINE_ NexusBytecodeArgument() : NexusBytecodeArgument(VOID) {}
+    _FORCE_INLINE_ NexusBytecodeArgument() : NexusBytecodeArgument(NONE) {}
+    NexusBytecodeArgument(StackStructMetadata* p_struct_metadata) {
+        type = STACK_STRUCT;
+        data = p_struct_metadata;
+    }
     _FORCE_INLINE_ explicit NexusBytecodeArgument(const uint32_t& p_value){
         type = UNSIGNED_32_BIT_INTEGER;
         auto_store(p_value);
@@ -220,15 +234,15 @@ struct NexusBytecodeArgument : public NexusSerializedBytecode {
     }
     ~NexusBytecodeArgument() override {
         switch (type) {
-            case UNSIGNED_32_BIT_INTEGER: memdelete((uint32_t*)data);
-            case SIGNED_32_BIT_INTEGER: memdelete((int32_t*)data);
-            case UNSIGNED_64_BIT_INTEGER: memdelete((uint64_t*)data);
-            case SIGNED_64_BIT_INTEGER: memdelete((int64_t*)data);
-            case SINGLE_PRECISION_FLOATING_POINT: memdelete((float*)data);
-            case DOUBLE_PRECISION_FLOATING_POINT: memdelete((double*)data);
-            case STRING_LITERAL: memdelete((VString*)data);
+            case UNSIGNED_32_BIT_INTEGER: memdelete((uint32_t*)data); break;
+            case SIGNED_32_BIT_INTEGER: memdelete((int32_t*)data); break;
+            case UNSIGNED_64_BIT_INTEGER: memdelete((uint64_t*)data); break;
+            case SIGNED_64_BIT_INTEGER: memdelete((int64_t*)data); break;
+            case SINGLE_PRECISION_FLOATING_POINT: memdelete((float*)data); break;
+            case DOUBLE_PRECISION_FLOATING_POINT: memdelete((double*)data); break;
+            case STRING_LITERAL: memdelete((VString*)data); break;
             // Not supported / Should be deleted as address
-            case VOID:
+            case STACK_STRUCT: memdelete((StackStructMetadata*)data); break;
             case STRING:
             case REFERENCE_COUNTED_OBJECT:
             case METHOD:
@@ -256,6 +270,9 @@ public:
 };
 
 struct NexusBytecodeMethodBody : public NexusSerializedBytecode {
+private:
+    int64_t instruction_iter = -1;
+public:
     // VString instead of CharString for greater compatibility
     VString method_name{};
     Vector<Ref<NexusBytecodeArgument>> arguments{};
@@ -265,6 +282,9 @@ struct NexusBytecodeMethodBody : public NexusSerializedBytecode {
 
     void deserialize(const FilePointer& p_file) override;
     void serialize(FilePointer& p_file) const override;
+
+    void read_header(const FilePointer& p_file);
+    Ref<NexusBytecodeRawInstruction> read_next_instruction(const FilePointer& p_file);
 };
 
 class NexusBytecode : public NexusSerializedBytecode {
@@ -281,26 +301,113 @@ private:
 //    Vector<double> f64_constants{};
 //    Vector<VString> string_literals{};
     // Method metadata
-    Vector<Ref<NexusMethodMetadata>> methods_metadata{};
+    Vector<Ref<NexusBytecodeMethodMetadata>> methods_metadata{};
     Vector<Ref<NexusBytecodeMethodBody>> method_bodies{};
-
+    HashMap<VString, Ref<NexusBytecodeMethodMetadata>> metadata_map{};
+    HashMap<VString, Ref<NexusBytecodeMethodBody>> bodies_map{};
 public:
     void deserialize(const FilePointer& p_file) override;
     void serialize(FilePointer& p_file) const override;
     void load_header(const FilePointer& p_file);
     void load_methods_body(const FilePointer& p_file);
-    _FORCE_INLINE_ const Vector<Ref<NexusMethodMetadata>>& get_methods_metadata() const { return methods_metadata; }
+    _FORCE_INLINE_ const Vector<Ref<NexusBytecodeMethodMetadata>>& get_methods_metadata() const { return methods_metadata; }
     _FORCE_INLINE_ const Vector<Ref<NexusBytecodeMethodBody>>& get_method_bodies() const { return method_bodies; }
+    _FORCE_INLINE_ const HashMap<VString, Ref<NexusBytecodeMethodMetadata>>& get_metadata_map() const { return metadata_map; }
+    _FORCE_INLINE_ const HashMap<VString, Ref<NexusBytecodeMethodBody>>& get_bodies_map() const { return bodies_map; }
 
 private:
     _FORCE_INLINE_ void parse_from_file(const FilePointer& p_file) { deserialize(p_file); }
 public:
+    _FORCE_INLINE_ void build_metadata_map(){
+        metadata_map.clear();
+        for (const auto& it : methods_metadata){
+            metadata_map[it->method_name] = it;
+        }
+    }
+    _FORCE_INLINE_ void build_bodies_map(){
+        bodies_map.clear();
+        for (const auto& it : method_bodies){
+            bodies_map[it->method_name] = it;
+        }
+    }
     NexusBytecode() : NexusSerializedBytecode() {}
     explicit NexusBytecode(const FilePointer& p_from) { parse_from_file(p_from); }
 
     _FORCE_INLINE_ void clear(){
         methods_metadata.clear();
         method_bodies.clear();
+    }
+};
+
+struct NexusBytecodeInstance;
+
+struct NexusMethodPointer : public Object {
+    virtual Ref<NexusBytecodeRawInstruction> get_next_instruction() = 0;
+    virtual Ref<NexusBytecodeMethodMetadata> get_method_metadata() const = 0;
+    virtual Vector<Ref<NexusBytecodeArgument>> get_arguments() const = 0;
+    
+    virtual void load_method(const Ref<NexusBytecodeInstance>& p_bci, const VString& p_method_name) = 0;
+};
+
+struct NexusMethodPointerJIT : public NexusMethodPointer {
+private:
+    FilePointer file{};
+    Ref<NexusBytecodeMethodBody> method_body{};
+    Ref<NexusBytecodeMethodMetadata> method_metadata{};
+public:
+    Ref<NexusBytecodeRawInstruction> get_next_instruction() override;
+    Ref<NexusBytecodeMethodMetadata> get_method_metadata() const override;
+    Vector<Ref<NexusBytecodeArgument>> get_arguments() const override;
+    
+    void load_method(const Ref<NexusBytecodeInstance>& p_bci, const VString& p_method_name) override;
+};
+
+struct NexusMethodPointerMemory : public NexusMethodPointer {
+private:
+    Ref<NexusBytecodeMethodBody> method_body{};
+    Ref<NexusBytecodeMethodMetadata> method_metadata{};
+    int64_t instructions_iter = -1;
+public:
+    Ref<NexusBytecodeRawInstruction> get_next_instruction() override;
+    Ref<NexusBytecodeMethodMetadata> get_method_metadata() const override;
+    Vector<Ref<NexusBytecodeArgument>> get_arguments() const override;
+
+    void load_method(const Ref<NexusBytecodeInstance>& p_bci, const VString& p_method_name) override;
+};
+
+struct NexusBytecodeInstance : public Object {
+public:
+    enum BytecodeLoadMode : unsigned int {
+        LOAD_HEADER,
+        LOAD_ALL,
+    };
+private:
+    mutable BinaryMutex lock{};
+public:
+    BytecodeLoadMode load_mode;
+    FilePointer file_pointer;
+    Ref<NexusBytecode> bytecode;
+    HashMap<VString, uint64_t> bodies_location{};
+    uint64_t header_end{};
+    NexusBytecodeInstance(const FilePointer& p_fp, BytecodeLoadMode p_load_mode);
+    NexusBytecodeInstance(const VString& p_bc_path, BytecodeLoadMode p_load_mode);
+
+    _FORCE_INLINE_ Ref<NexusMethodPointer> get_method(const VString& p_method_name) const {
+        GUARD(lock);
+        if (!bytecode->get_metadata_map().exists(p_method_name)) throw BytecodeException("Method not found");
+        Ref<NexusMethodPointer> ptr = nullptr;
+        switch (load_mode){
+            case LOAD_HEADER:
+                ptr = Ref<NexusMethodPointerJIT>::make_ref().cast<NexusMethodPointer>();
+                break;
+            case LOAD_ALL:
+                ptr = Ref<NexusMethodPointerMemory>::make_ref().cast<NexusMethodPointer>();
+                break;
+            default:
+                throw BytecodeException("Load mode not supported");
+        }
+        ptr->load_method(const_cast<NexusBytecodeInstance*>(this), p_method_name);
+        return ptr;
     }
 };
 

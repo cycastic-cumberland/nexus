@@ -33,6 +33,9 @@ public:
 
     _NO_DISCARD_ uint32_t hash_u32() const;
     _NO_DISCARD_ bool operator==(const VString& other) const;
+    _NO_DISCARD_ _FORCE_INLINE_ bool operator==(const char* other) const { return *this == VString(other); }
+    _NO_DISCARD_ _FORCE_INLINE_ bool operator!=(const VString& other) const { return !(*this == other); }
+    _NO_DISCARD_ _FORCE_INLINE_ bool operator!=(const char* other) const { return !(*this == VString(other)); }
     void copy_from(const wchar_t *p_source, const int& p_clip_to);
     void copy_from(const char *p_source);
     bool parse_utf8(const char *p_utf8, int p_len = -1, const bool& p_skip_cr = false);

@@ -9,14 +9,14 @@ NexusRuntime::NexusRuntime() : Object() {
     anonymous_instances_count.set(0);
 }
 
-void NexusRuntime::load_bytecode(const VString &p_bytecode_path, NexusRuntime::BytecodeLoadMode p_load_mode) {
+void NexusRuntime::load_bytecode(const VString &p_bytecode_path, NexusBytecodeInstance::BytecodeLoadMode p_load_mode) {
     W_GUARD(rwlock);
     Ref<NexusBytecodeInstance> instance = Ref<NexusBytecodeInstance>::make_ref(p_bytecode_path, p_load_mode);
     bytecode_instances[p_bytecode_path] = instance;
     cache_method_bodies(instance);
 }
 
-void NexusRuntime::load_bytecode(FilePointer &p_file_pointer, NexusRuntime::BytecodeLoadMode p_load_mode) {
+void NexusRuntime::load_bytecode(FilePointer &p_file_pointer, NexusBytecodeInstance::BytecodeLoadMode p_load_mode) {
     W_GUARD(rwlock);
     Ref<NexusBytecodeInstance> instance = Ref<NexusBytecodeInstance>::make_ref(p_file_pointer, p_load_mode);
     bytecode_instances[VString("@AnonymousInstance:") + itos(anonymous_instances_count.increment())] = instance;

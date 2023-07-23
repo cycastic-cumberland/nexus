@@ -3,7 +3,6 @@
 //
 
 #include "object.h"
-#include "lock.h"
 
 HashMap<uint64_t, Object*> ObjectDB::objects_registry = HashMap<uint64_t, Object*>();
 SafeNumeric<uint64_t> ObjectDB::refcount = SafeNumeric<uint64_t>(0);

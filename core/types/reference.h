@@ -96,7 +96,9 @@ public:
     }
 
     static _ALWAYS_INLINE_ Ref<T> init(T* p_from){
-        Ref<T> re = p_from;
+        p_from->init_ref();
+        Ref<T> re{};
+        re = p_from;
         return re;
     }
     static _ALWAYS_INLINE_ Ref<T> init(){

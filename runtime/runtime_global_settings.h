@@ -7,8 +7,10 @@
 
 #include "../core/typedefs.h"
 
+
 struct NexusRuntimeGlobalSettings {
     uint32_t stack_size;
+    bool bytecode_endian_mode;
 private:
     static NexusRuntimeGlobalSettings settings;
 public:

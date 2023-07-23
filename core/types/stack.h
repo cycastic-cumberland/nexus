@@ -24,6 +24,15 @@ private:
     StackNode* latest{};
     StackNode* genesis{};
     size_t size_cache{};
+    _FORCE_INLINE_ void copy(const Stack& p_other){
+        auto buffer = new Stack();
+        for (auto it = p_other.last(); it != nullptr; it = it->unwind()){
+            buffer->push(it->get_value());
+        }
+        while (!buffer->empty()){
+            push(buffer->pop());
+        }
+    }
 public:
     _FORCE_INLINE_ void push(const T& p_value){
         auto new_node = new StackNode();
@@ -59,15 +68,14 @@ public:
     _NO_DISCARD_ _FORCE_INLINE_ size_t size() const { return size_cache; }
     _NO_DISCARD_ _FORCE_INLINE_ bool empty() const { return size() == 0; }
     _NO_DISCARD_ _FORCE_INLINE_ const StackNode* last() const { return latest; }
+    _FORCE_INLINE_ Stack& operator=(const Stack& p_other){
+        clear();
+        copy(p_other);
+        return *this;
+    }
     Stack() = default;
-    Stack(const Stack& p_other){
-        auto buffer = new Stack();
-        for (auto it = p_other.last(); it != nullptr; it = it->unwind()){
-            buffer->push(it->get_value());
-        }
-        while (!buffer->empty()){
-            push(buffer->pop());
-        }
+    Stack(const Stack& p_other) : Stack() {
+        copy(p_other);
     }
     ~Stack(){
         clear();

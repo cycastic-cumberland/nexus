@@ -37,11 +37,15 @@ public:
         free(buffer);
         return virtual_ptr;
     }
+    static FilePointer duplicate_pointer(const FilePointer& p_pointer){
+        FilePointer re = p_pointer->duplicate();
+        return re;
+    }
     static bool exists(const VString& p_file_path){
         auto file_ptr = open(p_file_path, FileAccess::ACCESS_READ, false);
-        auto is_opened = file_ptr->is_open();
+        auto file_exists = file_ptr->is_open();
         file_ptr->close();
-        return is_opened;
+        return file_exists;
     }
 };
 

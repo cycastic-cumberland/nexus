@@ -11,11 +11,15 @@
 class x86FileAccess : public FileAccess {
 private:
     std::fstream f;
+    VString file_path{};
 public:
     void close() override;
     void flush() override;
     bool is_open() const override;
     void open(const VString& p_file_path, AccessType p_access_type) override;
+
+    VString get_absolute_path() const override { return file_path; }
+    VString get_path() const override { return get_absolute_path(); }
 
     size_t get_pos() const override;
     size_t get_file_size() const override;
@@ -25,6 +29,8 @@ public:
     uint8_t peek_8() const override;
     uint8_t get_8() const override;
     void store_8(const uint8_t& p_data) override;
+
+    FileAccess* duplicate() const override;
 private:
     void close_file() { close(); }
 public:
