@@ -6,10 +6,10 @@
 #define NEXUS_BUILTIN_H
 
 #include "../../core/types/vstring.h"
-#include <iostream>
+#include "../nexus_output.h"
 
-static void builtin_print(VString* p_out){
-    std::wcout << *p_out << std::endl;
+static void builtin_println(VString* p_out){
+    print_line(*p_out);
 }
 
 #endif //NEXUS_BUILTIN_H

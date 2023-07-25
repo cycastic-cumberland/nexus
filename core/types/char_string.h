@@ -53,17 +53,17 @@ public:
         resize(capacity() + 1);
         ptrw()[length()] = p_from;
     }
-    _FORCE_INLINE_ _NO_DISCARD_ CharString operator+(const char* p_from) const {
+    _NO_DISCARD_ _FORCE_INLINE_ CharString operator+(const char* p_from) const {
         CharString re = *this;
         re += p_from;
         return re;
     }
-    _FORCE_INLINE_ _NO_DISCARD_ CharString operator+(const CharString& p_from) const {
+    _NO_DISCARD_ _FORCE_INLINE_ CharString operator+(const CharString& p_from) const {
         CharString re = *this;
         re += p_from;
         return re;
     }
-    _FORCE_INLINE_ _NO_DISCARD_ CharString operator+(const char& p_from) const {
+    _NO_DISCARD_ _FORCE_INLINE_ CharString operator+(const char& p_from) const {
         CharString re = *this;
         re += p_from;
         return re;

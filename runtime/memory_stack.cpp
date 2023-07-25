@@ -3,7 +3,7 @@
 
 void MemoryStack::push_ambiguous(const AmbiguousValue& p_ambiguous){
     // Max size per value is 64 bit anyway...
-    if (sizeof(uint64_t) + stack_objects_size > NexusRuntimeGlobalSettings::get_settings().stack_size)
+    if (sizeof(uint64_t) + stack_objects_size > NexusRuntimeGlobalSettings::get_settings()->stack_size)
         throw MemoryStackException("Stack overflow");
     stack_objects_count++;
     stack_objects_data_type.push_back(p_ambiguous.get_type());
@@ -31,8 +31,12 @@ break;                                                                          
             PUSH_AMBIGUOUS_ITEM(VString)
         case NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT:
             PUSH_AMBIGUOUS_ITEM(Ref<Object>)
-        case NexusSerializedBytecode::STACK_STRUCT:
-            PUSH_AMBIGUOUS_ITEM(StackStructMetadata);
+        case NexusSerializedBytecode::STACK_STRUCT: {
+            // Aside from allocating the struct metadata, also make space for the actual data
+            auto as_struct = (StackStruct*)p_ambiguous.get_raw_pointer();
+            stack_objects_size += sizeof(StackStruct) + as_struct->metadata.get_struct_size();
+            new (&stack_location[current_offset]) StackStruct(*as_struct);
+        }
         case NexusSerializedBytecode::METHOD:
         case NexusSerializedBytecode::STRING_LITERAL:
         case NexusSerializedBytecode::NONE:
@@ -70,9 +74,13 @@ void MemoryStack::pop(){
         case NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT: 
             object_destroy<Ref<Object>>(obj_offset);
             break;
-        case NexusSerializedBytecode::STACK_STRUCT:
-            object_destroy<StackStructMetadata>(obj_offset);
+        case NexusSerializedBytecode::STACK_STRUCT: {
+            auto as_struct = ((StackStruct*)&stack_location[obj_offset]);
+//            as_struct->cleanup();
+            as_struct->~StackStruct();
+            stack_objects_size = obj_offset;
             break;
+        }
         case NexusSerializedBytecode::STRING_LITERAL:
         case NexusSerializedBytecode::METHOD:
         case NexusSerializedBytecode::NONE:
@@ -113,7 +121,7 @@ void MemoryStack::set_object(const int32_t& p_relative_idx, const AmbiguousValue
             OBJECT_SET_HELPER(Ref<Object>, get_object);
             break;
         case NexusSerializedBytecode::STACK_STRUCT:
-            OBJECT_SET_HELPER(StackStructMetadata, get_object);
+            OBJECT_SET_HELPER(StackStruct, get_struct);
             break;
         case NexusSerializedBytecode::METHOD:
         case NexusSerializedBytecode::STRING_LITERAL:
@@ -161,4 +169,16 @@ void MemoryStack::set_object(const int32_t& p_relative_idx, const void* p_item){
         case NexusSerializedBytecode::NONE:
             throw MemoryStackException("This should not happen???");
     }
+}
+
+void MemoryStack::push(const StackStructMetadata &p_struct_metadata) {
+    auto object_size = sizeof(StackStruct) + p_struct_metadata.get_struct_size();
+    if (object_size + stack_objects_size > NexusRuntimeGlobalSettings::get_settings()->stack_size)
+        throw MemoryStackException("Stack overflow");
+    stack_objects_count++;
+    stack_objects_data_type.push_back(NexusSerializedBytecode::STACK_STRUCT);
+    stack_objects_offset.push_back(stack_objects_size);
+    auto current_offset = stack_objects_size;
+    stack_objects_size += object_size;
+    new (&stack_location[current_offset]) StackStruct(p_struct_metadata);
 }

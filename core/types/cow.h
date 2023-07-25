@@ -27,7 +27,7 @@ private:
         }
     }
     void ref(CowData* p_data){
-        // Does not rwlock
+        // Does not lock
         if (p_data == cow_data) return;
         unref();
         cow_data = p_data;

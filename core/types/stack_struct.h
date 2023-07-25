@@ -11,21 +11,27 @@
 struct NexusBytecodeArgument;
 
 struct StackStructMetadata {
-    Vector<Ref<NexusBytecodeArgument>> struct_metadata;
+private:
     size_t total_struct_size;
+public:
+    Vector<Ref<NexusBytecodeArgument>> struct_metadata;
     explicit StackStructMetadata(const Vector<Ref<NexusBytecodeArgument>>& p_args);
     StackStructMetadata(const StackStructMetadata& p_other);
-    StackStructMetadata& operator=(const StackStructMetadata& p_other);
+
+    _NO_DISCARD_ _FORCE_INLINE_ size_t get_struct_size() const { return total_struct_size;}
 };
 
-// A struct that live on the memory stack
 struct StackStruct {
     StackStructMetadata metadata;
 
-    _NO_DISCARD_ _FORCE_INLINE_ const StackStructMetadata& get_metadata() const { return metadata; }
-    _NO_DISCARD_ _FORCE_INLINE_ size_t get_struct_size() const { return metadata.total_struct_size; }
-    _NO_DISCARD_ _FORCE_INLINE_ const uint8_t* get_data() const { return (const uint8_t*)(this + sizeof(StackStructMetadata)); }
-    _NO_DISCARD_ _FORCE_INLINE_ uint8_t* get_data() { return (uint8_t*)(this + sizeof(StackStructMetadata)); }
+    explicit StackStruct(const Vector<Ref<NexusBytecodeArgument>>& p_args);
+    explicit StackStruct(const StackStructMetadata& p_metadata);
+    StackStruct(const StackStruct& p_other);
+    StackStruct& operator=(const StackStruct& p_other);
+
+    _NO_DISCARD_ void * get_data() const;
+    void cleanup();
+    ~StackStruct();
 };
 
 #endif //NEXUS_STACK_STRUCT_H

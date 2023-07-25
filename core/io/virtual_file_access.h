@@ -45,10 +45,6 @@ public:
         memcpy(data.ptrw(), p_buffer, p_bytes_count);
         position += p_bytes_count;
     }
-private:
-    void not_virtual_seek(const size_t& p_pos) {
-        seek(p_pos);
-    }
 public:
     void allocate(const size_t& p_bytes){ data.resize(get_file_size() + p_bytes); }
 
@@ -56,7 +52,7 @@ public:
     VirtualFileAccess(const VirtualFileAccess& p_other) : VirtualFileAccess(p_other.access_type,
                                                                             p_other.get_endian_mode()){
         data = p_other.data;
-        not_virtual_seek(p_other.get_pos());
+        VirtualFileAccess::seek(p_other.get_pos());
     }
     FileAccess* duplicate() const override {
         return new VirtualFileAccess(*this);

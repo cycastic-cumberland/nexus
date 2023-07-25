@@ -31,12 +31,10 @@ public:
     void store_8(const uint8_t& p_data) override;
 
     FileAccess* duplicate() const override;
-private:
-    void close_file() { close(); }
 public:
 
     x86FileAccess(AccessType p_type, const bool& p_endian_swap) : f(), FileAccess(p_type, p_endian_swap) {}
-    ~x86FileAccess() override { close_file(); }
+    ~x86FileAccess() override { x86FileAccess::close(); }
 };
 
 #endif //NEXUS_X86_FILE_ACCESS

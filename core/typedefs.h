@@ -38,7 +38,7 @@ inline void __swap_tmpl(T &x, T &y) {
 // Should always inline, except in dev builds because it makes debugging harder.
 #ifndef _FORCE_INLINE_
 #ifdef DEV_ENABLED
-#define _FORCE_INLINE_
+#define _FORCE_INLINE_ inline
 #else
 #define _FORCE_INLINE_ _ALWAYS_INLINE_
 #endif
@@ -56,8 +56,8 @@ inline void __swap_tmpl(T &x, T &y) {
 #endif
 
 #define GUARD(lock_by_reference) LockGuard __guard(lock_by_reference)
-#define R_GUARD(lock_by_reference) ReadLockGuard __guard(lock_by_reference)
-#define W_GUARD(lock_by_reference) WriteLockGuard __guard(lock_by_reference)
+#define R_GUARD(lock_by_reference) ReadLockGuard __r_guard(lock_by_reference)
+#define W_GUARD(lock_by_reference) WriteLockGuard __w_guard(lock_by_reference)
 
 static _FORCE_INLINE_ size_t string_length(const char* p_str){
     size_t re = 0;

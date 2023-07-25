@@ -8,18 +8,7 @@
 
 #if defined(_WIN32) || defined(_WIN64)
 #include <dwmapi.h>
-#include <fcntl.h>
-#include <io.h>
 #include <shellapi.h>
-#include <stdio.h>
-
-#include <avrt.h>
-#include <direct.h>
-#include <knownfolders.h>
-#include <process.h>
-#include <regstr.h>
-#include <shlobj.h>
-System* System::singleton = new WindowsSystem();
 #endif
 
 static VString format_error_message(DWORD id) {
@@ -36,7 +25,7 @@ static VString format_error_message(DWORD id) {
 
 void WindowsSystem::load_dynamic_library(const VString &p_lib_path, void *&p_library_handle,
                                          const bool &p_also_set_library_path) {
-    auto path = p_lib_path.replace("/", "\\");;
+    auto path = FileAccessServer::path_fix(p_lib_path);
     if (!FileAccessServer::exists(p_lib_path)) throw SystemException("Library not exists");
 
     // Stolen from Godot
@@ -77,7 +66,11 @@ void WindowsSystem::get_dynamic_library_symbol_handle(void *p_library_handle, co
 }
 
 WindowsSystem::WindowsSystem() : System() {
+    singleton = this;
+}
 
+void WindowsSystem::print_line(const VString &p_message) {
+    std::wcout << p_message << L'\n';
 }
 
 WindowsSystem::~WindowsSystem() = default;

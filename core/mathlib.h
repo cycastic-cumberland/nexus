@@ -8,24 +8,33 @@
 #include <cmath>
 #include "typedefs.h"
 
+//#ifndef _HUGE_NUMBER
+//#define _HUGE_NUMBER  1e+300
+//#endif
+//
+//#define INFINITY   ((float)(_HUGE_NUMBER * _HUGE_NUMBER))
+//#define NAN        (-(float)(INFINITY * 0.0F))
+
 class Math {
 public:
-    static _ALWAYS_INLINE_ bool is_nan(double p_val) {
-#ifdef _MSC_VER
-        return _isnan(p_val);
-#elif defined(__GNUC__) && __GNUC__ < 6
-        union {
-			uint64_t u;
-			double f;
-		} ieee754;
-		ieee754.f = p_val;
-		// (unsigned)(0x7ff0000000000001 >> 32) : 0x7ff00000
-		return ((((unsigned)(ieee754.u >> 32) & 0x7fffffff) + ((unsigned)ieee754.u != 0)) > 0x7ff00000);
-#else
-        return std::isnan(p_val);
-#endif
-    }
+    static constexpr uint32_t max_u32 = 0xFFFFFFFF;
+    static constexpr uint32_t min_u32 = 0x0;
+    static constexpr int32_t  max_i32 = 0x7FFFFFFF;
+    static constexpr  int32_t min_i32 = 0x80000000;
+    static constexpr uint64_t max_u64 = 0xFFFFFFFFFFFFFFFF;
+    static constexpr uint64_t min_u64 = 0x0;
+    static constexpr  int64_t max_i64 = 0x7FFFFFFFFFFFFFFF;
+    static constexpr  int64_t min_i64 = 0x8000000000000000;
 
+    static _ALWAYS_INLINE_ bool is_infinite(const double& p_val) {
+        return std::isinf(p_val);
+    }
+    static _ALWAYS_INLINE_ bool is_infinite(const float& p_val) {
+        return std::isinf(p_val);
+    }
+    static _ALWAYS_INLINE_ bool is_nan(double p_val) {
+        return std::isnan(p_val);
+    }
     template<typename T>
     static _ALWAYS_INLINE_ T max(const T& p_left, const T& p_right){
         return p_left > p_right ? p_left : p_right;
@@ -34,9 +43,21 @@ public:
     static _ALWAYS_INLINE_ T abs(const T& p_val){
         return p_val > 0 ? p_val : -p_val;
     }
+    template<typename T>
+    static _ALWAYS_INLINE_ T clamp(const T& p_val, const T& p_lower, const T& p_upper){
+        return p_val < p_lower ? p_lower : (p_val > p_upper ? p_upper : p_val);
+    }
+    static _ALWAYS_INLINE_ double clamp01(const double& p_val){
+        return clamp(p_val, 0.0, 1.0);
+    }
+    static _ALWAYS_INLINE_ float clamp01(const float& p_val){
+        return clamp(p_val, 0.0f, 1.0f);
+    }
 };
 
 #define MAX(m_a, m_b) Math::max(m_a, m_b)
 #define ABS(m_val) Math::abs(m_val)
+#define CLAMP(m_val, m_low, m_high) Math::clamp(m_val, m_low, m_high)
+#define CLAMP01(m_val) Math::clamp01(m_val)
 
 #endif //NEXUS_MATHLIB_H

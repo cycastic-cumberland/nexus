@@ -127,6 +127,8 @@ public:
         return flag.load(std::memory_order_acquire);
     }
 
+    _ALWAYS_INLINE_ void wait() const { while (!is_set()) {} }
+
     _ALWAYS_INLINE_ void set() {
         flag.store(true, std::memory_order_release);
     }
@@ -139,7 +141,7 @@ public:
         flag.store(p_value, std::memory_order_release);
     }
 
-    _ALWAYS_INLINE_ explicit SafeFlag(bool p_value = false) {
+    _ALWAYS_INLINE_ SafeFlag(bool p_value = false) {
         set_to(p_value);
     }
 };

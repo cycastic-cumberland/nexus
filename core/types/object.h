@@ -40,10 +40,6 @@ private:
     static void register_object(Object* obj);
     static void remove_object(Object* obj);
 public:
-    template<class T>
-    static _ALWAYS_INLINE_ Ref<T> create_instance(T* p_from_pointer = nullptr){
-        return Ref<T>::init(p_from_pointer);
-    }
     static Object* get_instance(const uint64_t& p_id);
     static Vector<uint64_t> get_all_objects_id();
 };

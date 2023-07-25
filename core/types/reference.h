@@ -76,18 +76,8 @@ public:
     Ref(const Ref &p_from) {
         ref(p_from);
     }
-    Ref(T *p_reference) {
-        if (p_reference) {
-            p_reference->init_ref();
-            reference = p_reference;
-        }
-    }
     _NO_DISCARD_ _ALWAYS_INLINE_ bool is_valid() const { return reference != nullptr; }
     _NO_DISCARD_ _ALWAYS_INLINE_ bool is_null() const { return reference == nullptr; }
-
-    void instantiate() {
-        ref(new T);
-    }
 
     Ref() = default;
 
@@ -95,20 +85,23 @@ public:
         unref();
     }
 
-    static _ALWAYS_INLINE_ Ref<T> init(T* p_from){
-        p_from->init_ref();
+    static _ALWAYS_INLINE_ Ref<T> from_initialized_object(T* p_ptr){
         Ref<T> re{};
-        re = p_from;
+        if (!p_ptr->ref()) return re;
+        re.reference = p_ptr;
         return re;
     }
-    static _ALWAYS_INLINE_ Ref<T> init(){
-        Ref<T> re = new T();
+    static _ALWAYS_INLINE_ Ref<T> from_uninitialized_object(T* p_ptr){
+        p_ptr->init_ref();
+        Ref<T> re{};
+        re.reference = p_ptr;
         return re;
     }
     template<class... Args >
     static _ALWAYS_INLINE_ Ref<T> make_ref(Args&&... args){
-        return init(new T(args...));
+        return from_uninitialized_object(new T(args...));
     }
+    static _ALWAYS_INLINE_ Ref<T> null() { return Ref<T>(); }
 };
 
 #endif //NEXUS_REFERENCE_H

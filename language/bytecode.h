@@ -232,26 +232,7 @@ struct NexusBytecodeArgument : public NexusSerializedBytecode {
         type = STRING_LITERAL;
         auto_store(p_value);
     }
-    ~NexusBytecodeArgument() override {
-        switch (type) {
-            case UNSIGNED_32_BIT_INTEGER: memdelete((uint32_t*)data); break;
-            case SIGNED_32_BIT_INTEGER: memdelete((int32_t*)data); break;
-            case UNSIGNED_64_BIT_INTEGER: memdelete((uint64_t*)data); break;
-            case SIGNED_64_BIT_INTEGER: memdelete((int64_t*)data); break;
-            case SINGLE_PRECISION_FLOATING_POINT: memdelete((float*)data); break;
-            case DOUBLE_PRECISION_FLOATING_POINT: memdelete((double*)data); break;
-            case STRING_LITERAL: memdelete((VString*)data); break;
-            // Not supported / Should be deleted as address
-            case STACK_STRUCT: memdelete((StackStructMetadata*)data); break;
-            case STRING:
-            case REFERENCE_COUNTED_OBJECT:
-            case METHOD:
-                if (data) memdelete((size_t*)data);
-                break;
-            case NONE:
-                break;
-        }
-    }
+    ~NexusBytecodeArgument() override;
     void deserialize(const FilePointer& p_file) override {
         throw BytecodeParseException("NexusBytecodeArgument cannot deserialize by itself");
     }
@@ -271,7 +252,6 @@ public:
 
 struct NexusBytecodeMethodBody : public NexusSerializedBytecode {
 private:
-    int64_t instruction_iter = -1;
 public:
     // VString instead of CharString for greater compatibility
     VString method_name{};
@@ -284,7 +264,7 @@ public:
     void serialize(FilePointer& p_file) const override;
 
     void read_header(const FilePointer& p_file);
-    Ref<NexusBytecodeRawInstruction> read_next_instruction(const FilePointer& p_file);
+    static Ref<NexusBytecodeRawInstruction> read_next_instruction(const FilePointer& p_file);
 };
 
 class NexusBytecode : public NexusSerializedBytecode {
@@ -342,6 +322,8 @@ public:
 struct NexusBytecodeInstance;
 
 struct NexusMethodPointer : public Object {
+    virtual int64_t get_iterator() const = 0;
+    virtual void move_iterator(const int64_t& p_new_pos) = 0;
     virtual Ref<NexusBytecodeRawInstruction> get_next_instruction() = 0;
     virtual Ref<NexusBytecodeMethodMetadata> get_method_metadata() const = 0;
     virtual Vector<Ref<NexusBytecodeArgument>> get_arguments() const = 0;
@@ -354,7 +336,11 @@ private:
     FilePointer file{};
     Ref<NexusBytecodeMethodBody> method_body{};
     Ref<NexusBytecodeMethodMetadata> method_metadata{};
+    Vector<size_t> offsets{};
+    int64_t instructions_iter = -1;
 public:
+    int64_t get_iterator() const override { return instructions_iter; }
+    void move_iterator(const int64_t& p_new_pos) override;
     Ref<NexusBytecodeRawInstruction> get_next_instruction() override;
     Ref<NexusBytecodeMethodMetadata> get_method_metadata() const override;
     Vector<Ref<NexusBytecodeArgument>> get_arguments() const override;
@@ -368,6 +354,8 @@ private:
     Ref<NexusBytecodeMethodMetadata> method_metadata{};
     int64_t instructions_iter = -1;
 public:
+    int64_t get_iterator() const override { return instructions_iter; }
+    void move_iterator(const int64_t& p_new_pos) override { instructions_iter = p_new_pos; }
     Ref<NexusBytecodeRawInstruction> get_next_instruction() override;
     Ref<NexusBytecodeMethodMetadata> get_method_metadata() const override;
     Vector<Ref<NexusBytecodeArgument>> get_arguments() const override;
@@ -387,7 +375,7 @@ public:
     BytecodeLoadMode load_mode;
     FilePointer file_pointer;
     Ref<NexusBytecode> bytecode;
-    HashMap<VString, uint64_t> bodies_location{};
+    HashMap<VString, size_t> bodies_location{};
     uint64_t header_end{};
     NexusBytecodeInstance(const FilePointer& p_fp, BytecodeLoadMode p_load_mode);
     NexusBytecodeInstance(const VString& p_bc_path, BytecodeLoadMode p_load_mode);
@@ -395,7 +383,7 @@ public:
     _FORCE_INLINE_ Ref<NexusMethodPointer> get_method(const VString& p_method_name) const {
         GUARD(lock);
         if (!bytecode->get_metadata_map().exists(p_method_name)) throw BytecodeException("Method not found");
-        Ref<NexusMethodPointer> ptr = nullptr;
+        Ref<NexusMethodPointer> ptr = Ref<NexusMethodPointer>::null();
         switch (load_mode){
             case LOAD_HEADER:
                 ptr = Ref<NexusMethodPointerJIT>::make_ref().cast<NexusMethodPointer>();
@@ -406,7 +394,8 @@ public:
             default:
                 throw BytecodeException("Load mode not supported");
         }
-        ptr->load_method(const_cast<NexusBytecodeInstance*>(this), p_method_name);
+        auto ref_self = Ref<NexusBytecodeInstance>::from_initialized_object(const_cast<NexusBytecodeInstance *>(this));
+        ptr->load_method(ref_self, p_method_name);
         return ptr;
     }
 };

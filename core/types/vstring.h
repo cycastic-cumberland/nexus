@@ -7,6 +7,7 @@
 
 #include <iostream>
 #include "../exception.h"
+#include "char_string.h"
 
 class VStringException : public Exception {
 public:

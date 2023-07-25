@@ -6,12 +6,16 @@
 #define NEXUS_VECTOR_H
 
 #include "vstring.h"
+#include "../comparator.h"
 
 template <typename T>
 class Vector {
     CowArray<T> data;
     size_t usage = 0;
 public:
+    _NO_DISCARD_ _FORCE_INLINE_ size_t capacity() const { return data.capacity(); }
+    _NO_DISCARD_ _FORCE_INLINE_ size_t size() const { return usage; }
+    _NO_DISCARD_ _FORCE_INLINE_ bool empty() const { return size() == 0; }
     // Stolen from Godot
     struct Iterator {
         _FORCE_INLINE_ T &operator*() const {
@@ -77,14 +81,6 @@ public:
         return ConstIterator(ptr() + size());
     }
 public:
-    _NO_DISCARD_ _FORCE_INLINE_ size_t capacity() const { return data.capacity(); }
-    _NO_DISCARD_ _FORCE_INLINE_ size_t size() const { return usage; }
-    _NO_DISCARD_ _FORCE_INLINE_ bool empty() const { return size() == 0; }
-    _FORCE_INLINE_ void clear() {
-        // Manually object_destroy every element;
-        while (!empty()) pop_back();
-        usage = 0;
-    }
     _FORCE_INLINE_ void range_check(const size_t& idx) const { if (idx >= size()) throw std::out_of_range("Index out of range"); }
     _FORCE_INLINE_ const T& operator[](const size_t& idx) const { range_check(idx); return data.ptr()[idx]; }
     _FORCE_INLINE_ T& operator[](const size_t& idx) { range_check(idx); return data.ptrw()[idx]; }
@@ -93,6 +89,11 @@ public:
         if (size() == capacity()) data.resize(capacity() == 0 ? 1 : capacity() * 2);
         // Call copy constructor
         new (&data.ptrw()[usage++]) T(p_value);
+    }
+    template<class... Args>
+    _FORCE_INLINE_ void emplace(Args&& ...args){
+        if (size() == capacity()) data.resize(capacity() == 0 ? 1 : capacity() * 2);
+        new (&data.ptrw()[usage++]) T(args...);
     }
     _FORCE_INLINE_ void append(const Vector<T>& p_other){
         for (int i = 0; i < p_other.size(); i++){
@@ -104,6 +105,41 @@ public:
             push_back(item);
         }
     }
+    _FORCE_INLINE_ void insert(const size_t& idx, const T& p_item){
+        if (idx > size()) throw std::out_of_range("idx must be lower or equal to size");
+        if (size() == idx) { push_back(p_item); return; }
+        memmove(&data.ptrw()[idx + 1], &data.ptrw()[idx], sizeof(T) * (size() - idx));
+        new (&data[idx]) T(p_item);
+        usage++;
+    }
+    template<class... Args>
+    _FORCE_INLINE_ void emplace_at(const size_t& idx, Args&& ...args){
+        if (idx > size()) throw std::out_of_range("idx must be lower or equal to size");
+        if (size() == idx) { emplace(args...); return; }
+        memmove(&data.ptrw()[idx + 1], &data.ptrw()[idx], sizeof(T) * (size() - idx));
+        new (&data.ptrw()[idx]) T(args...);
+        usage++;
+    }
+    _FORCE_INLINE_ void remove(const size_t& idx){
+        if (idx >= size()) throw std::out_of_range("idx must be lower than size");
+        if (!std::is_trivially_destructible<T>::value) data.ptrw()[idx]->~T();
+        memmove(&data.ptrw()[idx], &data.ptrw()[idx + 1], sizeof(T) * (size() - idx - 1));
+        usage--;
+        if (size() <= capacity() / 2) data.resize(capacity() / 2);
+    }
+    template <class Comparator = StandardComparator<T>>
+    _FORCE_INLINE_ int64_t find(const T& p_item){
+        for (size_t i = 0; i < size(); i++){
+            if (Comparator::compare((*this)[i], p_item)) return int64_t(i);
+        }
+        return -1;
+    }
+    _FORCE_INLINE_ bool erase(const T& p_item){
+        auto idx = find(p_item);
+        if (idx == -1) return false;
+        remove(int64_t(idx));
+        return true;
+    }
     _FORCE_INLINE_ void pop_back(){
         if (size() == 0) throw std::out_of_range("Vector is empty");
         --usage;
@@ -112,7 +148,11 @@ public:
         if (!std::is_trivially_destructible<T>::value) data.ptrw()[size()].~T();
         if (size() <= capacity() / 2) data.resize(capacity() / 2);
     }
-
+    _FORCE_INLINE_ void clear() {
+        // Manually object_destroy every element;
+        while (!empty()) pop_back();
+        usage = 0;
+    }
     _FORCE_INLINE_ Vector() { data = CowArray<T>(); }
     _FORCE_INLINE_ explicit Vector(const size_t& starting_capacity) : Vector() { data.resize(starting_capacity); }
     _FORCE_INLINE_ Vector(const std::initializer_list<T>& p_init_list) : Vector(p_init_list.size()) {

@@ -7,6 +7,9 @@
 
 #include <mutex>
 #include <shared_mutex>
+#ifdef DEBUG_ENABLED
+#include <thread>
+#endif
 
 class Lock {
 public:
@@ -18,19 +21,73 @@ public:
 class BinaryMutex : public Lock {
 private:
     std::mutex _mutex{};
+#ifdef DEBUG_ENABLED
+    std::thread::id acquired_by{};
+#endif
 public:
-    void lock() override { _mutex.lock(); }
-    void unlock() override { _mutex.unlock(); }
-    bool try_lock() override { return _mutex.try_lock(); }
+    void lock() override {
+        _mutex.lock();
+#ifdef DEBUG_ENABLED
+        acquired_by = std::this_thread::get_id();
+#endif
+    }
+    void unlock() override {
+#ifdef DEBUG_ENABLED
+        acquired_by = std::thread::id();
+#endif
+        _mutex.unlock();
+    }
+    bool try_lock() override {
+#ifdef DEBUG_ENABLED
+        auto success = _mutex.try_lock();
+        if (success) acquired_by = std::thread::id();
+        return success;
+#else
+        return _mutex.try_lock();
+#endif
+    }
+
+#ifdef DEBUG_ENABLED
+      std::thread::id currently_acquired_by() const {
+        return acquired_by;
+    }
+#endif
 };
 
 class SharedMutex : public Lock {
 private:
     std::shared_mutex _mutex{};
+#ifdef DEBUG_ENABLED
+    std::thread::id acquired_by{};
+#endif
 public:
-    void lock() override { _mutex.lock(); }
-    void unlock() override { _mutex.unlock(); }
-    bool try_lock() override { return _mutex.try_lock(); }
+    void lock() override {
+        _mutex.lock();
+#ifdef DEBUG_ENABLED
+        acquired_by = std::this_thread::get_id();
+#endif
+    }
+    void unlock() override {
+#ifdef DEBUG_ENABLED
+        acquired_by = std::thread::id();
+#endif
+        _mutex.unlock();
+    }
+    bool try_lock() override {
+#ifdef DEBUG_ENABLED
+        auto success = _mutex.try_lock();
+        if (success) acquired_by = std::thread::id();
+        return success;
+#else
+        return _mutex.try_lock();
+#endif
+    }
+
+#ifdef DEBUG_ENABLED
+      std::thread::id currently_acquired_by() const {
+        return acquired_by;
+    }
+#endif
 };
 
 class LockGuard {
@@ -49,7 +106,9 @@ public:
 
 class RWLock {
     mutable std::shared_timed_mutex mutex;
-
+#ifdef DEBUG_ENABLED
+    std::thread::id acquired_by{};
+#endif
 public:
     void read_lock() const {
         mutex.lock_shared();
@@ -62,12 +121,27 @@ public:
     }
     void write_lock() {
         mutex.lock();
+#ifdef DEBUG_ENABLED
+        acquired_by = std::this_thread::get_id();
+#endif
     }
     void write_unlock() {
+#ifdef DEBUG_ENABLED
+        acquired_by = std::thread::id();
+#endif
         mutex.unlock();
     }
     bool write_try_lock() {
+#ifdef DEBUG_ENABLED
+        auto success = mutex.try_lock();
+        if (success) acquired_by = std::thread::id();
+        return success;
+#else
         return mutex.try_lock();
+#endif
+    }
+    RWLock() : mutex() {
+
     }
 };
 
@@ -96,6 +170,40 @@ public:
     explicit WriteLockGuard(RWLock& lock) : WriteLockGuard(&lock) {}
     ~WriteLockGuard() {
         inner_lock->write_unlock();
+    }
+};
+
+#include <functional>
+
+template <class T>
+class ReaderWriter {
+private:
+    T object;
+    mutable RWLock lock;
+public:
+    template <class ...Args>
+    ReaderWriter(Args&& ...args) : object(args...), lock() {}
+    ReaderWriter(const T& p_other) : object(p_other), lock() {}
+
+    void read(std::function<void(const T&)> cb) const {
+        lock.read_lock();
+        cb(object);
+        lock.read_unlock();
+    }
+    template <typename TR>
+    TR rread(std::function<TR(const T&)> cb) const {
+        ReadLockGuard guard(lock);
+        return cb(object);
+    }
+    void write(std::function<void(T&)> cb) {
+        lock.write_lock();
+        cb(object);
+        lock.write_unlock();
+    }
+    template <typename TR>
+    TR rwrite(std::function<TR(T&)> cb) {
+        WriteLockGuard guard(lock);
+        return cb(object);
     }
 };
 

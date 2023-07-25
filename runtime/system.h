@@ -30,6 +30,15 @@ public:
     virtual void get_dynamic_library_symbol_handle(void *p_library_handle, const CharString& p_name, void *&p_symbol_handle, const bool& p_optional = false){
         throw SystemException("Unavailable");
     }
+    virtual void print_line(const VString& p_message){
+        throw SystemException("Unavailable");
+    }
+    virtual void print_error(const VString& p_message) {
+        throw SystemException("Unavailable");
+    }
+    virtual void print_warning(const VString& p_message) {
+        throw SystemException("Unavailable");
+    }
     virtual void yield() { std::this_thread::yield(); }
     virtual ~System() = default;
 };

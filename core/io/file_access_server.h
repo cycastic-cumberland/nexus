@@ -12,18 +12,27 @@ typedef Ref<FileAccess> FilePointer;
 
 class FileAccessServer {
 public:
-    static FilePointer open(const VString& p_file_path, FileAccess::AccessType p_access_type, const bool& p_endian_swap = false){
-#if defined(__linux__) || defined(__unix__) || defined(_WIN32) || defined(_WIN64)
-        auto access = new x86FileAccess(p_access_type, p_endian_swap);
+    static VString path_fix(const VString& p_file_path){
+#if defined(_WIN32) || defined(_WIN64)
+        return p_file_path.replace("/", "\\");
 #else
-        return {};
+        return p_file_path.replace("\\", "/");
 #endif
-        access->open(p_file_path, p_access_type);
-        Ref<FileAccess> ref = access;
+    }
+
+    static FilePointer open(const VString& p_file_path, FileAccess::AccessType p_access_type, const bool& p_endian_swap = false){
+        VString path = path_fix(p_file_path);
+#if defined(__linux__) || defined(__unix__) || defined(_WIN32) || defined(_WIN64)
+        auto access = Ref<x86FileAccess>::make_ref(p_access_type, p_endian_swap);
+#else
+        return nullptr;
+#endif
+        access->open(path, p_access_type);
+        Ref<FileAccess> ref = access.cast<FileAccess>();
         return ref;
     }
     static FilePointer open_virtual(FileAccess::AccessType p_access_type = FileAccess::ACCESS_READ_WRITE, const bool& p_endian_swap = false){
-        Ref<FileAccess> ref = new VirtualFileAccess(p_access_type, p_endian_swap);
+        Ref<FileAccess> ref = Ref<VirtualFileAccess>::make_ref(p_access_type, p_endian_swap).cast<FileAccess>();
         return ref;
     }
     static FilePointer copy_to_memory(const VString& p_file_path, const bool& p_endian_swap = false){
@@ -38,7 +47,7 @@ public:
         return virtual_ptr;
     }
     static FilePointer duplicate_pointer(const FilePointer& p_pointer){
-        FilePointer re = p_pointer->duplicate();
+        FilePointer re = FilePointer::from_uninitialized_object(p_pointer->duplicate());
         return re;
     }
     static bool exists(const VString& p_file_path){

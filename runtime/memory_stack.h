@@ -39,7 +39,7 @@ private:
 
     template<class T>
     _FORCE_INLINE_ void push(const T& p_data, const NexusSerializedBytecode::DataType& p_type){
-        if (sizeof(T) + stack_objects_size > NexusRuntimeGlobalSettings::get_settings().stack_size)
+        if (sizeof(T) + stack_objects_size > NexusRuntimeGlobalSettings::get_settings()->stack_size)
             throw MemoryStackException("Stack overflow");
         stack_objects_count++;
         stack_objects_data_type.push_back(p_type);
@@ -107,7 +107,7 @@ public:
         return allocated_objects_in_this_frame() == 0;
     }
     MemoryStack(){
-        stack_location = (uint8_t *)malloc(NexusRuntimeGlobalSettings::get_settings().stack_size);
+        stack_location = (uint8_t *)malloc(NexusRuntimeGlobalSettings::get_settings()->stack_size);
         stack_objects_data_type = Vector<NexusSerializedBytecode::DataType>();
         stack_objects_offset = Vector<size_t>();
         stack_frames = Stack<StackFrame>();
@@ -142,6 +142,7 @@ public:
     _FORCE_INLINE_ void push(const Ref<Object>& p_data){
         push(p_data, NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT);
     }
+    void push(const StackStructMetadata& p_struct_metadata);
     _NO_DISCARD_ _FORCE_INLINE_ StackItem get_top() const {
         const auto& last_frame = stack_frames.peek_last();
         if (last_frame.objects_count_offset == stack_objects_count)
