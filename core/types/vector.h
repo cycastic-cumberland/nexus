@@ -122,7 +122,7 @@ public:
     }
     _FORCE_INLINE_ void remove(const size_t& idx){
         if (idx >= size()) throw std::out_of_range("idx must be lower than size");
-        if (!std::is_trivially_destructible<T>::value) data.ptrw()[idx]->~T();
+        if (!std::is_trivially_destructible<T>::value) data.ptrw()[idx].~T();
         memmove(&data.ptrw()[idx], &data.ptrw()[idx + 1], sizeof(T) * (size() - idx - 1));
         usage--;
         if (size() <= capacity() / 2) data.resize(capacity() / 2);

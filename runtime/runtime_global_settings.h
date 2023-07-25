@@ -12,7 +12,7 @@ struct NexusRuntimeGlobalSettings {
     bool bytecode_endian_mode;
 
     uint8_t task_scheduler_max_request_per_cycle;
-
+    uint8_t task_scheduler_starting_thread_count;
 private:
     static NexusRuntimeGlobalSettings* singleton;
 public:

@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 #include "../runtime/memory_stack.h"
+#include "../runtime/config.h"
 
 
 class MemoryStackTestFixture: public ::testing::Test{
@@ -85,6 +86,7 @@ public:
 };
 
 TEST_F(MemoryStackTestFixture, TestMemoryStack){
+    initialize_nexus_runtime(false);
     EXPECT_TRUE(value_push_test());
     EXPECT_TRUE(value_get_test());
     EXPECT_TRUE(pop_test());
@@ -93,4 +95,5 @@ TEST_F(MemoryStackTestFixture, TestMemoryStack){
     EXPECT_TRUE(value_push_test());
     EXPECT_TRUE(frame_deallocate_test());
     EXPECT_TRUE(frame_deallocate_test());
+    destroy_nexus_runtime();
 }

@@ -11,9 +11,9 @@
 #include "../core/types/hashmap.h"
 #include "../core/types/linked_list.h"
 #include "../core/lock.h"
-#include "threads_manager.h"
-#include "runtime_global_settings.h"
 #include "../core/types/queue.h"
+#include "runtime_global_settings.h"
+#include "threads_pool.h"
 
 class NexusMethodPointer;
 class NexusBytecodeInstance;
@@ -29,24 +29,20 @@ private:
     RWLock lock{};
     SafeNumeric<uint32_t> task_id_allocator{0};
     SafeFlag is_terminating{false};
-//    SafeFlag is_terminated{false};
-    Queue<Ref<Task>> tasks_queue{};
     HashMap<Ref<Task>, Ref<Task>, 32, Task, Task> frozen_tasks{};
-    uint32_t poll_thread_id{};
+    HashMap<uint32_t, Ref<Task>> in_transit_tasks{};
+    ThreadPool* thread_pool;
 
     static _ALWAYS_INLINE_ TaskScheduler* get_singleton() { return singleton; }
     static _ALWAYS_INLINE_ uint32_t next_task_id() {
         return get_singleton()->task_id_allocator.increment();
     }
     static void task_handler(void* p_async_request);
-    static void task_scheduler_daemon(void* p_ignored);
-
-    static void queue_task_internal(const Ref<Task>& p_task);
 
     friend class Task;
-    static void initialize_task_scheduler();
+    static Ref<ThreadPool::TaskTicket> queue_task_internal(const Ref<Task>& p_task, ThreadPool::Priority p_priority = ThreadPool::MEDIUM);
 public:
-    static void queue_task(const Ref<Task>& p_task);
+    static Ref<ThreadPool::TaskTicket> queue_task(const Ref<Task>& p_task, ThreadPool::Priority p_priority = ThreadPool::MEDIUM);
 
     TaskScheduler();
     ~TaskScheduler();

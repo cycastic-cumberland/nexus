@@ -55,6 +55,14 @@ inline void __swap_tmpl(T &x, T &y) {
 #define _ALLOW_DISCARD_ (void)
 #endif
 
+#ifdef __GNUC__
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+#else
+#define likely(x) x
+#define unlikely(x) x
+#endif
+
 #define GUARD(lock_by_reference) LockGuard __guard(lock_by_reference)
 #define R_GUARD(lock_by_reference) ReadLockGuard __r_guard(lock_by_reference)
 #define W_GUARD(lock_by_reference) WriteLockGuard __w_guard(lock_by_reference)

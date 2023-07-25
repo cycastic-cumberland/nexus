@@ -189,6 +189,7 @@ public:
     _FORCE_INLINE_ void clear(){
         if (!is_initialized()) return;
         delete current_map;
+        current_map = nullptr;
     }
 private:
     _FORCE_INLINE_ void copy(const HashMap& p_other){
