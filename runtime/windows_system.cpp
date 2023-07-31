@@ -26,7 +26,7 @@ static VString format_error_message(DWORD id) {
 void WindowsSystem::load_dynamic_library(const VString &p_lib_path, void *&p_library_handle,
                                          const bool &p_also_set_library_path) {
     auto path = FileAccessServer::path_fix(p_lib_path);
-    if (!FileAccessServer::exists(p_lib_path)) throw SystemException("Library not exists");
+    if (!FileAccessServer::exists(p_lib_path)) throw SystemException("Library not has");
 
     // Stolen from Godot
     typedef DLL_DIRECTORY_COOKIE(WINAPI * PAddDllDirectory)(PCWSTR);

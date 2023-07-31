@@ -29,13 +29,10 @@ public:
         uint8_t priority;
         Node(const Node& p_other) : data(p_other.data), priority(p_other.priority) {}
         Node(const T& p_data, const uint8_t& p_priority) : data(p_data), priority(p_priority) {}
+        Node(T&& p_data, const uint8_t& p_priority) : data(p_data), priority(p_priority) {}
     };
 private:
     Vector<Node> heap{};
-
-    _FORCE_INLINE_ void copy_from(const PriorityQueue& p_other){
-        heap = p_other.heap;
-    }
 
     void heapify_up(size_t idx){
         size_t parent = (idx - 1) / 2;
@@ -60,21 +57,22 @@ private:
             idx = largest;
         }
     }
+    void base_copy(const PriorityQueue& p_other) {
+        heap = p_other.heap;
+    }
+protected:
+    virtual void copy_from(const PriorityQueue& p_other){
+        base_copy(p_other);
+    }
 public:
-    _NO_DISCARD_ _ALWAYS_INLINE_ size_t size() const { return heap.size(); }
+    _NO_DISCARD_ virtual size_t size() const { return heap.size(); }
     _NO_DISCARD_ _ALWAYS_INLINE_ bool empty() const { return size() == 0; }
 
-    _FORCE_INLINE_ void push(const T& p_value, const uint8_t& p_priority){
-//        auto old_size = size();
+    virtual void push(const T& p_value, const uint8_t& p_priority){
         heap.push_back(Node(p_value, p_priority));
         heapify_up(size() - 1);
-//        if (old_size != 0){
-//            for (int64_t i = old_size / 2 - 1; i >= 0; i--){
-//                heapify_down(i);
-//            }
-//        }
     }
-    _FORCE_INLINE_ T pop(){
+    virtual T pop(){
         if (empty()) throw std::out_of_range("PriorityQueue is empty");
         auto re = heap[0].data;
         SWAP(heap[0], heap[size() - 1]);
@@ -82,9 +80,14 @@ public:
         heapify_down(0);
         return re;
     }
+    virtual bool try_pop(T& p_result) {
+        if (PriorityQueue<T, Comparator>::size() == 0) return false;
+        p_result = PriorityQueue<T, Comparator>::pop();
+        return true;
+    }
 
     PriorityQueue() = default;
-    PriorityQueue(const PriorityQueue& p_other) : PriorityQueue() { copy_from(p_other); }
+    PriorityQueue(const PriorityQueue& p_other) : PriorityQueue() { base_copy(p_other); }
     _FORCE_INLINE_ PriorityQueue& operator=(const PriorityQueue& p_other){
         copy_from(p_other);
         return *this;

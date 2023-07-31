@@ -13,7 +13,7 @@
 #include "../core/lock.h"
 #include "../core/types/queue.h"
 #include "runtime_global_settings.h"
-#include "threads_pool.h"
+#include "thread_pool.h"
 
 class NexusMethodPointer;
 class NexusBytecodeInstance;
@@ -37,12 +37,12 @@ private:
     static _ALWAYS_INLINE_ uint32_t next_task_id() {
         return get_singleton()->task_id_allocator.increment();
     }
-    static void task_handler(void* p_async_request);
+    static void task_handler(const Ref<Task>& p_async_request);
 
     friend class Task;
-    static Ref<ThreadPool::TaskTicket> queue_task_internal(const Ref<Task>& p_task, ThreadPool::Priority p_priority = ThreadPool::MEDIUM);
+    static std::future<void> queue_task_internal(const Ref<Task>& p_task);
 public:
-    static Ref<ThreadPool::TaskTicket> queue_task(const Ref<Task>& p_task, ThreadPool::Priority p_priority = ThreadPool::MEDIUM);
+    static std::future<void> queue_task(const Ref<Task>& p_task);
 
     TaskScheduler();
     ~TaskScheduler();

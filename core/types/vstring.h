@@ -54,6 +54,9 @@ public:
         return re;
     }
     _NO_DISCARD_ static VString num_int64(int64_t p_num, int base = 10, bool capitalize_hex = false);
+    _NO_DISCARD_ static VString num_uint64(int64_t p_num, int base = 10, bool capitalize_hex = false);
+    _NO_DISCARD_ static VString num(double p_num, int p_decimals = -1);
+    _NO_DISCARD_ static VString num_scientific(double p_num);
 
     _FORCE_INLINE_ VString() = default;
     _FORCE_INLINE_ VString(const VString& p_other) { data = p_other.data; }
@@ -96,5 +99,8 @@ public:
 };
 
 VString itos(int64_t p_val);
+VString uitos(uint64_t p_val);
+VString rtos(double p_val);
+VString rtoss(double p_val);
 
 #endif //NEXUS_VSTRING_H

@@ -87,13 +87,15 @@ public:
 
     static _ALWAYS_INLINE_ Ref<T> from_initialized_object(T* p_ptr){
         Ref<T> re{};
+        if (!p_ptr) return re;
         if (!p_ptr->ref()) return re;
         re.reference = p_ptr;
         return re;
     }
     static _ALWAYS_INLINE_ Ref<T> from_uninitialized_object(T* p_ptr){
-        p_ptr->init_ref();
         Ref<T> re{};
+        if (!p_ptr) return re;
+        p_ptr->init_ref();
         re.reference = p_ptr;
         return re;
     }

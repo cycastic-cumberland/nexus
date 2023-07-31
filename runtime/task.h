@@ -35,6 +35,7 @@ public:
 private:
     SafeFlag finished{false};
     uint32_t task_id;
+    uint8_t priority;
 
     Ref<Task> child_task;
     TupleT2<Task::AsyncCallbackReturn, Ref<Task>> (*callback)(NexusExecutionState*);
@@ -47,9 +48,11 @@ private:
     explicit Task(const uint32_t& p_id,
                   TupleT2<Task::AsyncCallbackReturn, Ref<Task>> (*p_callback)(NexusExecutionState*),
                   void (*p_resume_callback)(Ref<Task>, Ref<Task>),
-                  const Ref<NexusMethodPointer>& p_mp);
+                  const Ref<NexusMethodPointer>& p_mp,
+                  const uint8_t& p_priority);
 public:
     _FORCE_INLINE_ uint32_t get_id() const { return task_id; }
+    _FORCE_INLINE_ uint8_t get_priority() const { return priority; }
     _FORCE_INLINE_ bool is_finished() const { return finished.is_set(); }
     _FORCE_INLINE_ void wait() const {
         finished.wait();
@@ -69,7 +72,8 @@ public:
 
     explicit Task(TupleT2<Task::AsyncCallbackReturn, Ref<Task>> (*p_callback)(NexusExecutionState*),
                   void (*p_resume_callback)(Ref<Task>, Ref<Task>),
-                  const Ref<NexusMethodPointer>& p_mp);
+                  const Ref<NexusMethodPointer>& p_mp,
+                  const uint8_t& p_priority = 2);
     ~Task() override;
 };
 

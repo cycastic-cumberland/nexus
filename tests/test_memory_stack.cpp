@@ -10,10 +10,10 @@
 class MemoryStackTestFixture: public ::testing::Test{
     MemoryStack* mem;
 public:
-    void SetUp() override {
+    void PostSetUp() {
         mem = new MemoryStack();
     }
-    void TearDown() override {
+    void PreTearDown() {
         delete mem;
     }
     void new_stack_frame(){
@@ -87,6 +87,9 @@ public:
 
 TEST_F(MemoryStackTestFixture, TestMemoryStack){
     initialize_nexus_runtime(false);
+    auto starting_object_count = ObjectDB::get_object_count();
+    PostSetUp();
+//    EXPECT_FALSE(true);
     EXPECT_TRUE(value_push_test());
     EXPECT_TRUE(value_get_test());
     EXPECT_TRUE(pop_test());
@@ -95,5 +98,8 @@ TEST_F(MemoryStackTestFixture, TestMemoryStack){
     EXPECT_TRUE(value_push_test());
     EXPECT_TRUE(frame_deallocate_test());
     EXPECT_TRUE(frame_deallocate_test());
+    PreTearDown();
+    EXPECT_EQ(starting_object_count, ObjectDB::get_object_count());
+
     destroy_nexus_runtime();
 }

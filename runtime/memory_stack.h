@@ -92,6 +92,21 @@ public:
         });
         return stack_frames.peek_last();
     }
+    _FORCE_INLINE_ const StackFrame& allocate_stack_frame(const int32_t& p_negative_offset){
+        if (stack_frames.empty()){
+            throw MemoryStackException("There must be at least one stack frame before you can allocate another with a negative offset");
+        }
+        if (p_negative_offset > 0)
+            throw MemoryStackException("p_negative_offset must be lower or equal to 0");
+        auto prev_offset = stack_frames.peek_last().objects_count_offset;
+        auto curr_offset = stack_objects_count - p_negative_offset;
+        if (curr_offset <= prev_offset)
+            throw MemoryStackException("Absolute offset is lower or equal to previous frame offset");
+        stack_frames.push({
+           .objects_count_offset = curr_offset
+        });
+        return stack_frames.peek_last();
+    }
     _FORCE_INLINE_ void deallocate_stack_frame(){
         auto frame = stack_frames.pop();
         recline(frame.objects_count_offset);
@@ -154,7 +169,7 @@ public:
         auto absolute = p_relative_pos >= 0 ?
                         int32_t(last_frame.objects_count_offset) + p_relative_pos :
                         int32_t(stack_objects_count) + p_relative_pos;
-        if (last_frame.objects_count_offset > absolute || absolute > stack_objects_count)
+        if (last_frame.objects_count_offset > absolute || absolute >= stack_objects_count)
             throw MemoryStackException("Invalid stack index");
         return free_probe(absolute);
     }

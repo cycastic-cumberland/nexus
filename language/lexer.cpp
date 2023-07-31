@@ -131,7 +131,7 @@ NexusLexer::LexicalError NexusLexer::tokenize_text(const VString &text) {
                         break;
                     } else if (!buffer.empty()){
                         if (buffer == "!") THROW_LEX_ERR(LE_INVALID_OPERATOR_PLACEMENT);
-                        auto type = get_operators_map().exists(buffer) ? get_operators_map()[buffer] : TK_IDENTIFIER;
+                        auto type = get_operators_map().has(buffer) ? get_operators_map()[buffer] : TK_IDENTIFIER;
                         flush_lexeme_detailed(buffer, last_line, current_column_cursor, type);
                         last_char = 0;
                         buffer = "";
@@ -150,7 +150,7 @@ NexusLexer::LexicalError NexusLexer::tokenize_text(const VString &text) {
 #undef ASSIGNMENT_FLUSH_HELPER
         if (!buffer.empty()){
             if (buffer == "!") THROW_LEX_ERR(LE_INVALID_OPERATOR_PLACEMENT);
-            auto type = get_operators_map().exists(buffer) ? get_operators_map()[buffer] : TK_IDENTIFIER;
+            auto type = get_operators_map().has(buffer) ? get_operators_map()[buffer] : TK_IDENTIFIER;
             flush_lexeme_detailed(buffer, last_line, current_column_cursor, type);
         }
         current_lexeme = "";
@@ -160,7 +160,7 @@ NexusLexer::LexicalError NexusLexer::tokenize_text(const VString &text) {
 
     for (size_t i = 0, s = text.length(); i < s; i++, current_column++){
         const auto& curr_char = text[i];
-        auto mapped_type = get_tokens_map().exists(curr_char) ?
+        auto mapped_type = get_tokens_map().has(curr_char) ?
                            get_tokens_map()[curr_char] : TK_CHARACTER;
         switch (mapped_type) {
             case TK_FO_BACK_QUOTE:

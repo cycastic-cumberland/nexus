@@ -8,6 +8,7 @@
 #include <thread>
 #include "../core/typedefs.h"
 #include "../core/types/vstring.h"
+#include "managed_thread.h"
 
 class SystemException : public Exception {
 public:
@@ -39,7 +40,7 @@ public:
     virtual void print_warning(const VString& p_message) {
         throw SystemException("Unavailable");
     }
-    virtual void yield() { std::this_thread::yield(); }
+    virtual void yield() { ManagedThread::yield(); }
     virtual ~System() = default;
 };
 

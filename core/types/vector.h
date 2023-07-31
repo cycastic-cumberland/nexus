@@ -85,6 +85,7 @@ public:
     _FORCE_INLINE_ const T& operator[](const size_t& idx) const { range_check(idx); return data.ptr()[idx]; }
     _FORCE_INLINE_ T& operator[](const size_t& idx) { range_check(idx); return data.ptrw()[idx]; }
     _FORCE_INLINE_ const T& last() const { return operator[](size() - 1); }
+    _FORCE_INLINE_ T& last() { return operator[](size() - 1); }
     _FORCE_INLINE_ void push_back(const T& p_value){
         if (size() == capacity()) data.resize(capacity() == 0 ? 1 : capacity() * 2);
         // Call copy constructor

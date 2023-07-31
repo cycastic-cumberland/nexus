@@ -97,11 +97,11 @@ public:
         // Goto a label
         // Argument: 0: label's name
         OP_GOTO,
-        // Goto a label if the condition is satisfied. Will trigger if stack1 No.-1 is not 0
+        // Goto a label if the conditional_lock is satisfied. Will trigger if stack1 No.-1 is not 0
         // Argument: 0: label's name
         // Stack: -1: unsigned 32-bit integer or equivalent
         OP_GOTO_IF_TRUE,
-        // Goto a label if the condition is unsatisfied. Will trigger if stack1 No.-1 is 0
+        // Goto a label if the conditional_lock is unsatisfied. Will trigger if stack1 No.-1 is 0
         // Argument: 0: label's name
         // Stack: -1: unsigned 32-bit integer or equivalent
         OP_GOTO_IF_FALSE,
@@ -382,7 +382,7 @@ public:
 
     _FORCE_INLINE_ Ref<NexusMethodPointer> get_method(const VString& p_method_name) const {
         GUARD(lock);
-        if (!bytecode->get_metadata_map().exists(p_method_name)) throw BytecodeException("Method not found");
+        if (!bytecode->get_metadata_map().has(p_method_name)) throw BytecodeException("Method not found");
         Ref<NexusMethodPointer> ptr = Ref<NexusMethodPointer>::null();
         switch (load_mode){
             case LOAD_HEADER:

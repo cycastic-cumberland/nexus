@@ -40,8 +40,13 @@ private:
     static void register_object(Object* obj);
     static void remove_object(Object* obj);
 public:
-    static Object* get_instance(const uint64_t& p_id);
+    static Ref<Object> get_instance(const uint64_t& p_id);
+    static size_t get_object_count();
     static Vector<uint64_t> get_all_objects_id();
+
+#ifdef DEBUG_ENABLED
+    static Vector<Object*> get_all_instances();
+#endif
 };
 
 template <typename T>

@@ -61,6 +61,7 @@ static _FORCE_INLINE_ uint32_t hash_djb2_one_float(double p_in, uint32_t p_prev 
 
 struct StandardHasher {
     static _FORCE_INLINE_ uint32_t hash(const char* p_data) { return djb2_char_hash(p_data); }
+    static uint32_t hash(const wchar_t* p_data);
     static uint32_t hash(const VString& p_data);
     static _FORCE_INLINE_ uint32_t hash(const double & p_data) { return hash_djb2_one_float(p_data); }
     static _FORCE_INLINE_ uint32_t hash(const float & p_data) { return hash_djb2_one_float(p_data); }

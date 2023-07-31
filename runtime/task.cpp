@@ -27,14 +27,15 @@ bool Task::compare(const Ref<Task> &p_lhs, const Ref<Task> &p_rhs) {
 
 Task::Task(TupleT2<Task::AsyncCallbackReturn, Ref<Task>> (*p_callback)(NexusExecutionState*),
            void (*p_resume_callback)(Ref<Task>, Ref<Task>),
-           const Ref<NexusMethodPointer>& p_mp)
-           : Task(TaskScheduler::get_singleton()->task_id_allocator.increment(), p_callback, p_resume_callback, p_mp) {}
+           const Ref<NexusMethodPointer>& p_mp,
+           const uint8_t& p_priority)
+           : Task(TaskScheduler::get_singleton()->task_id_allocator.increment(), p_callback, p_resume_callback, p_mp, p_priority) {}
 
 Task::Task(const uint32_t &p_id,
            TupleT2<Task::AsyncCallbackReturn, Ref<Task>> (*p_callback)(NexusExecutionState *),
            void (*p_resume_callback)(Ref<Task>, Ref<Task>),
-           const Ref<NexusMethodPointer> &p_mp)
-           : task_id(p_id), callback(p_callback), resume_callback(p_resume_callback), state(p_mp){}
+           const Ref<NexusMethodPointer> &p_mp, const uint8_t& p_priority)
+           : task_id(p_id), callback(p_callback), resume_callback(p_resume_callback), state(p_mp), priority(p_priority) {}
 
 TupleT2<Task::AsyncCallbackReturn, Ref<Task>> Task::execute() const {
     return callback(const_cast<NexusExecutionState*>(&state));

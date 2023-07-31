@@ -21,49 +21,6 @@ private:
             delete next;
         }
     };
-public:
-    class KPIterator {
-    private:
-        const KeyPairValue** entries{};
-        int64_t capacity{};
-        const KeyPairValue* iterating{};
-        int64_t current_index{-1};
-    protected:
-        KPIterator() = default;
-    public:
-        KPIterator(const KeyPairValue** e, size_t cap){
-            entries = e;
-            capacity = (int64_t)cap;
-        }
-        bool move_next() {
-            while (current_index < capacity){
-                if (iterating == nullptr){
-                    ++current_index;
-                    if (current_index >= capacity) return false;
-                    iterating = entries[current_index];
-                    if (iterating) return true;
-                    else continue;
-                }
-                iterating = iterating->next;
-                if (iterating) return true;
-            }
-            return false;
-//            while (current_index < capacity){
-//                if (iterating && iterating->next) {
-//                    iterating = iterating->next;
-//                    return true;
-//                }
-//                else {
-//                    iterating = entries[++current_index];
-//                    if (current_index < capacity && iterating) return true;
-//                }
-//            }
-//            return false;
-        }
-        _FORCE_INLINE_ const KeyPairValue& get_pair() const {
-            return *iterating;
-        }
-    };
 private:
     size_t cap{};
     size_t entries_count{};
@@ -126,12 +83,87 @@ private:
             entries[i] = nullptr;
         }
     }
+    KeyPairValue* get_next_ptr(KeyPairValue* p_ptr = nullptr){
+        int64_t current_index = -1;
+        auto capacity = cap;
+        KeyPairValue* iterating = p_ptr;
+        if (p_ptr) current_index = get_index(p_ptr->key);
+        while (current_index < int64_t(capacity)){
+            if (iterating == nullptr){
+                ++current_index;
+                if (current_index >= capacity) return iterating;
+                iterating = entries[current_index];
+                if (iterating) return iterating;
+                else continue;
+            }
+            iterating = iterating->next;
+            if (iterating) return iterating;
+        }
+        return nullptr;
+    }
 public:
+    class Iterator;
+    class ConstIterator;
+
+    friend class Iterator;
+    friend class ConstIterator;
+
+    class ConstIterator {
+    private:
+        StaticHashMap* map;
+        KeyPairValue* iterating{};
+    protected:
+        ConstIterator() = default;
+    public:
+        explicit ConstIterator(const StaticHashMap* p_map) : map(const_cast<StaticHashMap*>(p_map)) {}
+        bool move_next() {
+            if (map == nullptr) return false;
+            iterating = map->get_next_ptr(iterating);
+            if (!iterating) map = nullptr;
+            return iterating != nullptr;
+        }
+        _FORCE_INLINE_ const KeyPairValue& get_pair() const {
+            return *iterating;
+        }
+    };
+    class Iterator {
+    private:
+        StaticHashMap* map;
+        KeyPairValue* iterating{};
+        KeyPairValue* prev_iterator{};
+    protected:
+        Iterator() = default;
+    public:
+        explicit Iterator(StaticHashMap* p_map) : map(p_map) {}
+        bool move_next() {
+            if (map == nullptr) return false;
+            prev_iterator = iterating;
+            iterating = map->get_next_ptr(prev_iterator);
+            if (!iterating) map = nullptr;
+            return iterating != nullptr;
+        }
+        _FORCE_INLINE_ void erase(){
+            if (map == nullptr) return;
+            if (prev_iterator){
+                prev_iterator->next = iterating->next;
+            } else {
+                map->entries[map->get_index(iterating->key)] = nullptr;
+            }
+            delete iterating;
+            iterating = prev_iterator;
+            map->entries_count--;
+            if (map->entries_count == 0) map = nullptr;
+        }
+        _FORCE_INLINE_ const KeyPairValue& get_pair() const {
+            return *iterating;
+        }
+    };
     _NO_DISCARD_ _ALWAYS_INLINE_ uint16_t capacity() const { return cap; }
-    _NO_DISCARD_ _ALWAYS_INLINE_ KPIterator const_iterator() const { return KPIterator(const_cast<const KeyPairValue**>(entries), capacity()); }
+    _NO_DISCARD_ _ALWAYS_INLINE_ ConstIterator const_iterator() const { return ConstIterator(this); }
+    _NO_DISCARD_ _ALWAYS_INLINE_ Iterator iterator() { return Iterator(this); }
 private:
     void copy_from(const StaticHashMap& p_other){
-        KPIterator it = p_other.const_iterator();
+        ConstIterator it = p_other.const_iterator();
         while (it.move_next()){
             get_or_create(it.get_pair().key) = it.get_pair().value;
         }
@@ -170,9 +202,13 @@ public:
 template <typename Key, typename Value, uint16_t StartingCapacity = 32, class Hasher = StandardHasher, class Comparator = StandardComparator<Key>>
 class HashMap {
 public:
-    class EmptyIterator : public StaticHashMap<Key, Value, Hasher, Comparator>::KPIterator {
+    class EmptyConstIterator : public StaticHashMap<Key, Value, Hasher, Comparator>::ConstIterator {
     public:
-        EmptyIterator() : StaticHashMap<Key, Value, Hasher, Comparator>::KPIterator(nullptr, 0) {}
+        EmptyConstIterator() : StaticHashMap<Key, Value, Hasher, Comparator>::ConstIterator(nullptr) {}
+    };
+    class EmptyIterator : public StaticHashMap<Key, Value, Hasher, Comparator>::Iterator {
+    public:
+        EmptyIterator() : StaticHashMap<Key, Value, Hasher, Comparator>::Iterator(nullptr) {}
     };
 private:
     float growth_factor;
@@ -226,7 +262,7 @@ public:
         copy(p_other);
         return *this;
     }
-    _NO_DISCARD_ _FORCE_INLINE_ bool exists(const Key& p_key) const {
+    _NO_DISCARD_ _FORCE_INLINE_ bool has(const Key& p_key) const {
         if (!is_initialized()) return false;
         return current_map->exists(p_key);
     }
@@ -241,9 +277,13 @@ public:
         if (!is_initialized()) return 0;
         return current_map->capacity();
     }
-    _NO_DISCARD_ _ALWAYS_INLINE_ typename StaticHashMap<Key, Value, Hasher, Comparator>::KPIterator const_iterator() const {
-        if (!is_initialized()) return EmptyIterator();
+    _NO_DISCARD_ _ALWAYS_INLINE_ typename StaticHashMap<Key, Value, Hasher, Comparator>::ConstIterator const_iterator() const {
+        if (!is_initialized()) return EmptyConstIterator();
         return current_map->const_iterator();
+    }
+    _NO_DISCARD_ _ALWAYS_INLINE_ typename StaticHashMap<Key, Value, Hasher, Comparator>::Iterator iterator() {
+        if (!is_initialized()) return EmptyIterator();
+        return current_map->iterator();
     }
     _FORCE_INLINE_ bool erase(const Key& p_key) noexcept {
         if (!is_initialized()) return false;

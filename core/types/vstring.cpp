@@ -8,6 +8,17 @@ VString itos(int64_t p_val) {
     return VString::num_int64(p_val);
 }
 
+VString uitos(uint64_t p_val) {
+    return VString::num_uint64(p_val);
+}
+
+VString rtos(double p_val) {
+    return VString::num(p_val);
+}
+VString rtoss(double p_val) {
+    return VString::num_scientific(p_val);
+}
+
 uint32_t VString::hash_u32() const {
     return StandardHasher::hash(*this);
 }
@@ -603,7 +614,7 @@ VString VString::num_int64(int64_t p_num, int base, bool capitalize_hex) {
     if (sign) {
         chars++;
     }
-    VString s;
+    VString s{};
     s.resize(chars + 1);
     auto *c = s.ptrw();
     c[chars] = 0;
@@ -625,4 +636,216 @@ VString VString::num_int64(int64_t p_num, int base, bool capitalize_hex) {
     }
 
     return s;
+}
+
+VString VString::num_uint64(int64_t p_num, int base, bool capitalize_hex) {
+    uint64_t n = p_num;
+
+    int chars = 0;
+    do {
+        n /= base;
+        chars++;
+    } while (n);
+
+    VString s{};
+    s.resize(chars + 1);
+    auto *c = s.ptrw();
+    c[chars] = 0;
+    n = p_num;
+    do {
+        int mod = n % base;
+        if (mod >= 10) {
+            char a = (capitalize_hex ? 'A' : 'a');
+            c[--chars] = a + (mod - 10);
+        } else {
+            c[--chars] = '0' + mod;
+        }
+
+        n /= base;
+    } while (n);
+
+    return s;
+}
+
+VString VString::num(double p_num, int p_decimals) {
+    if (Math::is_nan(p_num)) {
+        return "nan";
+    }
+
+#ifndef NO_USE_STDLIB
+
+    if (p_decimals > 16) {
+        p_decimals = 16;
+    }
+
+    char fmt[7];
+    fmt[0] = '%';
+    fmt[1] = '.';
+
+    if (p_decimals < 0) {
+        fmt[1] = 'l';
+        fmt[2] = 'f';
+        fmt[3] = 0;
+
+    } else if (p_decimals < 10) {
+        fmt[2] = '0' + p_decimals;
+        fmt[3] = 'l';
+        fmt[4] = 'f';
+        fmt[5] = 0;
+    } else {
+        fmt[2] = '0' + (p_decimals / 10);
+        fmt[3] = '0' + (p_decimals % 10);
+        fmt[4] = 'l';
+        fmt[5] = 'f';
+        fmt[6] = 0;
+    }
+    char buf[256];
+
+#if defined(__GNUC__) || defined(_MSC_VER)
+    snprintf(buf, 256, fmt, p_num);
+#else
+    sprintf(buf, fmt, p_num);
+#endif
+
+    buf[255] = 0;
+    //destroy trailing zeroes
+    {
+        bool period = false;
+        int z = 0;
+        while (buf[z]) {
+            if (buf[z] == '.') {
+                period = true;
+            }
+            z++;
+        }
+
+        if (period) {
+            z--;
+            while (z > 0) {
+                if (buf[z] == '0') {
+                    buf[z] = 0;
+                } else if (buf[z] == '.') {
+                    buf[z] = 0;
+                    break;
+                } else {
+                    break;
+                }
+
+                z--;
+            }
+        }
+    }
+
+    return buf;
+#else
+
+    String s;
+	String sd;
+	/* integer part */
+
+	bool neg = p_num < 0;
+	p_num = ABS(p_num);
+	int intn = (int)p_num;
+
+	/* decimal part */
+
+	if (p_decimals > 0 || (p_decimals == -1 && (int)p_num != p_num)) {
+		double dec = p_num - (float)((int)p_num);
+
+		int digit = 0;
+		if (p_decimals > MAX_DIGITS)
+			p_decimals = MAX_DIGITS;
+
+		int dec_int = 0;
+		int dec_max = 0;
+
+		while (true) {
+			dec *= 10.0;
+			dec_int = dec_int * 10 + (int)dec % 10;
+			dec_max = dec_max * 10 + 9;
+			digit++;
+
+			if (p_decimals == -1) {
+				if (digit == MAX_DIGITS) //no point in going to infinite
+					break;
+
+				if ((dec - (float)((int)dec)) < 1e-6)
+					break;
+			}
+
+			if (digit == p_decimals)
+				break;
+		}
+		dec *= 10;
+		int last = (int)dec % 10;
+
+		if (last > 5) {
+			if (dec_int == dec_max) {
+				dec_int = 0;
+				intn++;
+			} else {
+				dec_int++;
+			}
+		}
+
+		String decimal;
+		for (int i = 0; i < digit; i++) {
+			char num[2] = { 0, 0 };
+			num[0] = '0' + dec_int % 10;
+			decimal = num + decimal;
+			dec_int /= 10;
+		}
+		sd = '.' + decimal;
+	}
+
+	if (intn == 0)
+
+		s = "0";
+	else {
+		while (intn) {
+			CharType num = '0' + (intn % 10);
+			intn /= 10;
+			s = num + s;
+		}
+	}
+
+	s = s + sd;
+	if (neg)
+		s = "-" + s;
+	return s;
+#endif
+}
+
+VString VString::num_scientific(double p_num) {
+    if (Math::is_nan(p_num)) {
+        return "nan";
+    }
+
+#ifndef NO_USE_STDLIB
+
+    char buf[256];
+
+#if defined(__GNUC__) || defined(_MSC_VER)
+
+#if defined(__MINGW32__) && defined(_TWO_DIGIT_EXPONENT) && !defined(_UCRT)
+    // MinGW requires _set_output_format() to conform to C99 output for printf
+    unsigned int old_exponent_format = _set_output_format(_TWO_DIGIT_EXPONENT);
+#endif
+    snprintf(buf, 256, "%lg", p_num);
+
+#if defined(__MINGW32__) && defined(_TWO_DIGIT_EXPONENT) && !defined(_UCRT)
+    _set_output_format(old_exponent_format);
+#endif
+
+#else
+    sprintf(buf, "%.16lg", p_num);
+#endif
+
+    buf[255] = 0;
+
+    return buf;
+#else
+
+    return String::num(p_num);
+#endif
 }

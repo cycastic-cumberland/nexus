@@ -19,37 +19,25 @@ TaskScheduler* TaskScheduler::singleton = nullptr;
 #define TS_WU TASK_SCHEDULER->lock.write_unlock();
 
 
-Ref<ThreadPool::TaskTicket> TaskScheduler::queue_task_internal(const Ref<Task> &p_task, ThreadPool::Priority p_priority) {
-    auto id = p_task->get_id();
-    // No one run this program on a 16-bit system anyway, amirite?
-    auto as_void_pointer = (void*)(size_t)id;
-    if (TASK_SCHEDULER->in_transit_tasks.exists(id)){
-        print_error(VString("Task with id ") + itos(id) + " has already been queued");
-        return Ref<ThreadPool::TaskTicket>::null();
-    }
-    // Keeping the task alive while a thread is picking it up
-    TASK_SCHEDULER->in_transit_tasks[id] = p_task;
-    auto ticket = TASK_SCHEDULER->thread_pool->queue_task(ThreadTask(task_handler, as_void_pointer), p_priority);
+std::future<void> TaskScheduler::queue_task_internal(const Ref<Task> &p_task) {
+    auto ticket = TASK_SCHEDULER->thread_pool->queue_task((ThreadPool::Priority)p_task->get_priority(),
+                                                          [p_task]() -> void { TaskScheduler::task_handler(p_task); });
     return ticket;
 }
 
-Ref<ThreadPool::TaskTicket> TaskScheduler::queue_task(const Ref<Task> &p_task, ThreadPool::Priority p_priority) {
-    TS_W;
-    return queue_task_internal(p_task, p_priority);
+std::future<void> TaskScheduler::queue_task(const Ref<Task> &p_task) {
+//    TS_W;
+    return queue_task_internal(p_task);
 }
 
 TaskScheduler::TaskScheduler() {
     singleton = this;
     thread_pool = new ThreadPool();
-    thread_pool->batch_allocate_threads(NexusRuntimeGlobalSettings::get_settings()->task_scheduler_starting_thread_count);
+    thread_pool->batch_allocate_workers(NexusRuntimeGlobalSettings::get_settings()->task_scheduler_starting_thread_count);
 }
 
-void TaskScheduler::task_handler(void *p_async_request) {
-    TS_WL
-    auto as_task_id = (uint32_t)(size_t)p_async_request;
-    auto current_task = TASK_SCHEDULER->in_transit_tasks[as_task_id];
-    TASK_SCHEDULER->in_transit_tasks.erase(as_task_id);
-    TS_WU
+void TaskScheduler::task_handler(const Ref<Task>& p_current_task) {
+    auto current_task = p_current_task;
     current_task->handle_resume();
     auto result = current_task->execute();
     Task::AsyncCallbackReturn async_return = Task::EXITED_SAFELY;
@@ -58,7 +46,7 @@ void TaskScheduler::task_handler(void *p_async_request) {
     switch (async_return) {
         case Task::EXITED_SAFELY:{
             TS_W
-            if (!TASK_SCHEDULER->frozen_tasks.exists(current_task)){
+            if (!TASK_SCHEDULER->frozen_tasks.has(current_task)){
                 // This is a genesis task, do nothing
             } else {
                 // This is spawned from another task, resuming it
@@ -83,7 +71,7 @@ void TaskScheduler::task_handler(void *p_async_request) {
 
 TaskScheduler::~TaskScheduler() {
     is_terminating.set();
-    thread_pool->join_all();
+    thread_pool->terminate_all_workers();
     delete thread_pool;
 }
 

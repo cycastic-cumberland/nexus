@@ -84,7 +84,7 @@ void MemoryStack::pop(){
         case NexusSerializedBytecode::STRING_LITERAL:
         case NexusSerializedBytecode::METHOD:
         case NexusSerializedBytecode::NONE:
-            throw MemoryStackException(CharString("Destructor not found for type: ") + itos(obj_type).utf8());
+            throw MemoryStackException(CharString("Destructor not found for type: ") + uitos(obj_type).utf8());
     }
 }
 

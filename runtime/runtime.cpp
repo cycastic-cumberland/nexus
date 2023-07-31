@@ -19,7 +19,7 @@ void NexusRuntime::load_bytecode(const VString &p_bytecode_path, NexusBytecodeIn
 void NexusRuntime::load_bytecode(FilePointer &p_file_pointer, NexusBytecodeInstance::BytecodeLoadMode p_load_mode) {
     W_GUARD(rwlock);
     Ref<NexusBytecodeInstance> instance = Ref<NexusBytecodeInstance>::make_ref(p_file_pointer, p_load_mode);
-    bytecode_instances[VString("@AnonymousInstance:") + itos(anonymous_instances_count.increment())] = instance;
+    bytecode_instances[VString("@AnonymousInstance:") + uitos(anonymous_instances_count.increment())] = instance;
     cache_method_bodies(instance);
 }
 
@@ -29,7 +29,7 @@ void NexusRuntime::cache_method_bodies(const Ref<NexusBytecodeInstance>& instanc
     try {
         while (it.move_next()){
             const auto& method_name = it.get_pair().key;
-            if (bytecode_method_bodies.exists(method_name)) throw RuntimeException(CharString("Method already exists: ") + method_name.utf8());
+            if (bytecode_method_bodies.has(method_name)) throw RuntimeException(CharString("Method already has: ") + method_name.utf8());
             bytecode_method_bodies[method_name] = instance;
         }
     } catch (const std::exception& ex){

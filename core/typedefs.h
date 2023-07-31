@@ -75,4 +75,12 @@ static _FORCE_INLINE_ size_t string_length(const char* p_str){
     return re;
 }
 
+static _FORCE_INLINE_ size_t string_length(const wchar_t* p_str){
+    size_t re = 0;
+    for (;;re++){
+        if (p_str[re] == 0) break;
+    }
+    return re;
+}
+
 #endif //NEXUS_TYPEDEFS_H
