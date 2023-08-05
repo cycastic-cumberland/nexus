@@ -28,11 +28,11 @@ public:
         return nullptr;
 #endif
         access->open(path, p_access_type);
-        Ref<FileAccess> ref = access.cast<FileAccess>();
+        Ref<FileAccess> ref = access.safe_cast<FileAccess>();
         return ref;
     }
     static FilePointer open_virtual(FileAccess::AccessType p_access_type = FileAccess::ACCESS_READ_WRITE, const bool& p_endian_swap = false){
-        Ref<FileAccess> ref = Ref<VirtualFileAccess>::make_ref(p_access_type, p_endian_swap).cast<FileAccess>();
+        Ref<FileAccess> ref = Ref<VirtualFileAccess>::make_ref(p_access_type, p_endian_swap).safe_cast<FileAccess>();
         return ref;
     }
     static FilePointer copy_to_memory(const VString& p_file_path, const bool& p_endian_swap = false){

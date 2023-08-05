@@ -52,7 +52,7 @@ public:
     explicit FileCannotBeOpenedException(const VString& p_err) : FileException(p_err.utf8().c_str()) {}
 };
 
-class FileAccess : public Object {
+class FileAccess : public ManagedObject {
 public:
     enum AccessType : unsigned int{
         ACCESS_READ = 1,
@@ -111,7 +111,7 @@ public:
     virtual void store_string(const VString& p_from);
     virtual void store_buffer(const uint8_t* p_buffer, const size_t& p_bytes_count);
 
-    explicit FileAccess(AccessType p_type, const bool& p_endian_swap = false) : Object(), access_type(p_type), endian_swap(p_endian_swap) {}
+    explicit FileAccess(AccessType p_type, const bool& p_endian_swap = false) : ManagedObject(), access_type(p_type), endian_swap(p_endian_swap) {}
 };
 
 #endif //NEXUS_FILE_ACCESS_H

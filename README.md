@@ -28,6 +28,8 @@ func main(): void {
 - Virtual machine stack: completed, partially tested
 - Memory management: completed, tested
 - Native function calls: to be worked on
-- ManagedThread pool: completed, untested
+- ManagedThread: completed, tested
+- Thread pool: completed, tested
+- Command queue: completed, untested
 - Task scheduling: completed, untested
 - Asynchronous execution: in-progress

@@ -28,7 +28,7 @@ StackStructMetadata::StackStructMetadata(const Vector<Ref<NexusBytecodeArgument>
                 total_struct_size += sizeof(VString);
                 break;
             case NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT:
-                total_struct_size += sizeof(Ref<Object>);
+                total_struct_size += sizeof(Ref<ManagedObject>);
                 break;
             case NexusSerializedBytecode::STACK_STRUCT:
             case NexusSerializedBytecode::STRING_LITERAL:
@@ -75,7 +75,7 @@ StackStruct::StackStruct(const StackStruct &p_other) : metadata(p_other.metadata
                 PLACEMENT_NEW(VString);
                 break;
             case NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT:
-                PLACEMENT_NEW(Ref<Object>);
+                PLACEMENT_NEW(Ref<ManagedObject>);
                 break;
             case NexusSerializedBytecode::STRING_LITERAL:
             case NexusSerializedBytecode::STACK_STRUCT:
@@ -116,7 +116,7 @@ StackStruct &StackStruct::operator=(const StackStruct &p_other) {
             COPY_VALUE(VString);
                 break;
             case NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT:
-            COPY_VALUE(Ref<Object>);
+            COPY_VALUE(Ref<ManagedObject>);
                 break;
             case NexusSerializedBytecode::STRING_LITERAL:
             case NexusSerializedBytecode::STACK_STRUCT:
@@ -162,7 +162,7 @@ void StackStruct::cleanup() {
                 FREE_OBJECT(VString);
                 break;
             case NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT:
-                FREE_OBJECT(Ref<Object>);
+                FREE_OBJECT(Ref<ManagedObject>);
                 break;
             case NexusSerializedBytecode::STRING_LITERAL:
             case NexusSerializedBytecode::STACK_STRUCT:

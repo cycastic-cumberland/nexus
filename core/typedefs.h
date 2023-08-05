@@ -50,7 +50,7 @@ inline void __swap_tmpl(T &x, T &y) {
 #endif
 
 // In some cases _NO_DISCARD_ will get_instance false positives,
-// we can prevent the warning in specific cases by preceding the call with a cast.
+// we can prevent the warning in specific cases by preceding the call with a safe_cast.
 #ifndef _ALLOW_DISCARD_
 #define _ALLOW_DISCARD_ (void)
 #endif

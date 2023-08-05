@@ -62,13 +62,6 @@ public:
         return reference;
     }
 
-    // Downward cast only
-    template <class To>
-    _FORCE_INLINE_ Ref<To> cast() const {
-        auto casted = (Ref<To>*)(this);
-        return *casted;
-    }
-
     Ref& operator=(const Ref &p_from) {
         ref(p_from);
         return *this;
@@ -104,6 +97,19 @@ public:
         return from_uninitialized_object(new T(args...));
     }
     static _ALWAYS_INLINE_ Ref<T> null() { return Ref<T>(); }
+
+    template <class To>
+    _FORCE_INLINE_ Ref<To> safe_cast() const {
+        auto casted = Ref<To>::from_initialized_object(dynamic_cast<To*>(reference));
+        return casted;
+    }
+    template <class To>
+    _FORCE_INLINE_ Ref<To> c_style_cast() const {
+        // Ref<T> only hold a single property, a reference to an object
+        // So assuming that the programmer know what they are doing, this should not cause any problem
+        auto casted = (Ref<To>*)this;
+        return *casted;
+    }
 };
 
 #endif //NEXUS_REFERENCE_H

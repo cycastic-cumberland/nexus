@@ -18,6 +18,13 @@ public:
     virtual bool try_lock() = 0;
 };
 
+class InertLock : Lock {
+public:
+    void lock() override {}
+    void unlock() override {}
+    bool try_lock() override { return true; }
+};
+
 class BinaryMutex : public Lock {
 private:
     std::mutex _mutex{};
@@ -110,28 +117,28 @@ class RWLock {
     std::thread::id acquired_by{};
 #endif
 public:
-    void read_lock() const {
+    virtual void read_lock() const {
         mutex.lock_shared();
     }
-    void read_unlock() const {
+    virtual void read_unlock() const {
         mutex.unlock_shared();
     }
-    bool read_try_lock() const {
+    virtual bool read_try_lock() const {
         return mutex.try_lock_shared();
     }
-    void write_lock() {
+    virtual void write_lock() {
         mutex.lock();
 #ifdef DEBUG_ENABLED
         acquired_by = std::this_thread::get_id();
 #endif
     }
-    void write_unlock() {
+    virtual void write_unlock() {
 #ifdef DEBUG_ENABLED
         acquired_by = std::thread::id();
 #endif
         mutex.unlock();
     }
-    bool write_try_lock() {
+    virtual bool write_try_lock() {
 #ifdef DEBUG_ENABLED
         auto success = mutex.try_lock();
         if (success) acquired_by = std::thread::id();
@@ -143,6 +150,17 @@ public:
     RWLock() : mutex() {
 
     }
+};
+
+class InertRWLock : public RWLock {
+public:
+    void read_lock() const override {}
+    void read_unlock() const override {}
+    bool read_try_lock() const override { return true; }
+    void write_lock() override {}
+    void write_unlock() override {}
+    bool write_try_lock() override { return true; }
+    InertRWLock() : RWLock() {}
 };
 
 class ReadLockGuard {

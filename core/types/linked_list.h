@@ -5,6 +5,7 @@
 #ifndef NEXUS_LINKED_LIST_H
 #define NEXUS_LINKED_LIST_H
 
+#include <initializer_list>
 #include "../typedefs.h"
 #include "../exception.h"
 
@@ -26,8 +27,7 @@ public:
 
         const LinkedList* master;
 
-        explicit LinkedListNode(const T& p_data, const LinkedList* p_master) {
-            data = p_data;
+        explicit LinkedListNode(const T& p_data, const LinkedList* p_master) : data(p_data) {
             master = p_master;
             next_ptr = nullptr;
             prev_ptr = nullptr;
@@ -42,6 +42,40 @@ private:
     LinkedListNode* first_ptr{};
     LinkedListNode* last_ptr{};
     size_t size_cache{};
+
+    _FORCE_INLINE_ void add_node_last(LinkedListNode* p_node){
+        if (last_ptr == nullptr){
+            last_ptr = p_node;
+            first_ptr = p_node;
+        } else {
+            last_ptr->next_ptr = p_node;
+            p_node->prev_ptr = last_ptr;
+            last_ptr = p_node;
+        }
+        size_cache++;
+    }
+    _FORCE_INLINE_ void add_node_front(LinkedListNode* p_node){
+        if (first_ptr == nullptr){
+            first_ptr = p_node;
+            last_ptr = p_node;
+        } else {
+            first_ptr->prev_ptr = p_node;
+            p_node->next_ptr = first_ptr;
+            first_ptr = p_node;
+        }
+        size_cache++;
+    }
+    _FORCE_INLINE_ void insert_node_after(const LinkedListNode* p_node, LinkedListNode* p_new_node){
+        if (p_node->next_ptr){
+            p_new_node->next_ptr = p_node->next_ptr;
+            p_node->next_ptr->prev_ptr = p_new_node;
+            p_node->next_ptr = p_new_node;
+        } else {
+            p_node->next_ptr = p_new_node;
+            p_new_node->prev_ptr = p_node;
+        }
+        size_cache++;
+    }
 public:
     _FORCE_INLINE_ const LinkedListNode* first() const { return first_ptr; }
     _FORCE_INLINE_ const LinkedListNode* last() const { return last_ptr; }
@@ -60,41 +94,34 @@ public:
     }
     _FORCE_INLINE_ void add_last(const T& p_data){
         auto new_node = new LinkedListNode(p_data, this);
-        if (last_ptr == nullptr){
-            last_ptr = new_node;
-            first_ptr = new_node;
-        } else {
-            last_ptr->next_ptr = new_node;
-            new_node->prev_ptr = last_ptr;
-            last_ptr = new_node;
-        }
-        size_cache++;
+        add_node_last(new_node);
+    }
+    template<class ...Args>
+    _FORCE_INLINE_ void emplace_last(Args&& ...args){
+        auto new_node = new LinkedListNode(T(args...), this);
+        add_node_last(new_node);
     }
     _FORCE_INLINE_ void add_front(const T& p_data){
         auto new_node = new LinkedListNode(p_data, this);
-        if (first_ptr == nullptr){
-            first_ptr = new_node;
-            last_ptr = new_node;
-        } else {
-            first_ptr->prev_ptr = new_node;
-            new_node->next_ptr = first_ptr;
-            first_ptr = new_node;
-        }
-        size_cache++;
+        add_node_front(new_node);
+    }
+    template<class ...Args>
+    _FORCE_INLINE_ void emplace_front(Args&& ...args){
+        auto new_node = new LinkedListNode(T(args...), this);
+        add_node_front(new_node);
     }
     _FORCE_INLINE_ void insert_after(const T& p_data, const LinkedListNode* p_node){
         if (!p_node) throw LinkedListException("Linked list node is null");
         if (p_node->master != this) throw LinkedListException("Linked list does not own this node");
         auto new_node = new LinkedListNode(p_data, this);
-        if (p_node->next_ptr){
-            new_node->next_ptr = p_node->next_ptr;
-            p_node->next_ptr->prev_ptr = new_node;
-            p_node->next_ptr = new_node;
-        } else {
-            p_node->next_ptr = new_node;
-            new_node->prev_ptr = p_node;
-        }
-        size_cache++;
+        insert_node_after(p_node, new_node);
+    }
+    template<class ...Args>
+    _FORCE_INLINE_ void emplace_after(const LinkedListNode* p_node, Args&& ...args){
+        if (!p_node) throw LinkedListException("Linked list node is null");
+        if (p_node->master != this) throw LinkedListException("Linked list does not own this node");
+        auto new_node = new LinkedListNode(T(args...), this);
+        insert_node_after(p_node, new_node);
     }
     _FORCE_INLINE_ bool erase(const LinkedListNode* p_node){
         if (!p_node) return false;
@@ -118,11 +145,27 @@ public:
     _FORCE_INLINE_ void copy(const LinkedList& p_other){
         clear();
         for (const auto* it = p_other.first(); it; it = it->next()){
-            add_last(it->data);
+            emplace_last(it->data);
         }
     }
     LinkedList() = default;
     LinkedList(const LinkedList& p_other) : LinkedList() { copy(p_other); }
+    LinkedList(LinkedList&& p_other)  noexcept {
+        first_ptr = p_other.first_ptr;
+        last_ptr = p_other.last_ptr;
+        size_cache = p_other.size_cache;
+        for (auto* it = first_ptr; it; it = it->next()){
+            it->master = this;
+        }
+        p_other.first_ptr = nullptr;
+        p_other.last_ptr = nullptr;
+        p_other.size_cache = 0;
+    }
+    LinkedList(const std::initializer_list<T>& p_init_list) : LinkedList() {
+        for (const auto& item : p_init_list){
+            emplace_last(item);
+        }
+    }
     ~LinkedList() { clear(); }
 };
 

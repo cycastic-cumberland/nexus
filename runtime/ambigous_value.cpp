@@ -27,7 +27,7 @@ void AmbiguousValue::clear_and_set_from(const void* p_data, NexusSerializedBytec
             AUTO_CAST(VString);
             break;
         case NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT:
-            AUTO_CAST(Ref<Object>);
+            AUTO_CAST(Ref<ManagedObject>);
             break;
         case NexusSerializedBytecode::STACK_STRUCT: {
             auto other_as_metadata = (StackStruct*)p_data;
@@ -70,7 +70,7 @@ void AmbiguousValue::free_data() {
             delete (VString*)data;
             break;
         case NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT:
-            delete (Ref<Object>*)data;
+            delete (Ref<ManagedObject>*)data;
             break;
         case NexusSerializedBytecode::STACK_STRUCT:
 //            ((StackStructMetadata*)data)->cleanup();

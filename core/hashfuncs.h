@@ -9,6 +9,7 @@
 #include "typedefs.h"
 
 class VString;
+class InternedString;
 
 static _FORCE_INLINE_ uint32_t djb2_string_hash(const wchar_t* str){
     unsigned long hash = 5381;
@@ -63,6 +64,7 @@ struct StandardHasher {
     static _FORCE_INLINE_ uint32_t hash(const char* p_data) { return djb2_char_hash(p_data); }
     static uint32_t hash(const wchar_t* p_data);
     static uint32_t hash(const VString& p_data);
+    static uint32_t hash(const InternedString& p_data);
     static _FORCE_INLINE_ uint32_t hash(const double & p_data) { return hash_djb2_one_float(p_data); }
     static _FORCE_INLINE_ uint32_t hash(const float & p_data) { return hash_djb2_one_float(p_data); }
     static _FORCE_INLINE_ uint32_t hash(const uint64_t & p_data) { return hash_one_uint64(p_data); }

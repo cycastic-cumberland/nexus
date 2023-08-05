@@ -50,7 +50,7 @@ public:
     AmbiguousValue(const float& p_val) { init_from(p_val, NexusSerializedBytecode::SINGLE_PRECISION_FLOATING_POINT); }
     AmbiguousValue(const double& p_val) { init_from(p_val, NexusSerializedBytecode::DOUBLE_PRECISION_FLOATING_POINT); }
     AmbiguousValue(const VString& p_val) { init_from(p_val, NexusSerializedBytecode::STRING); }
-    AmbiguousValue(const Ref<Object>& p_val) { init_from(p_val, NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT); }
+    AmbiguousValue(const Ref<ManagedObject>& p_val) { init_from(p_val, NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT); }
 
     _FORCE_INLINE_ AmbiguousValue& operator=(const AmbiguousValue& p_other){
         clear_and_set_from(p_other.data, p_other.data_type);
@@ -65,7 +65,7 @@ public:
     _FORCE_INLINE_ float*& get_fp32() { return get_internal<float>(NexusSerializedBytecode::SINGLE_PRECISION_FLOATING_POINT); }
     _FORCE_INLINE_ double*& get_fp64() { return get_internal<double>(NexusSerializedBytecode::DOUBLE_PRECISION_FLOATING_POINT); }
     _FORCE_INLINE_ VString*& get_string() { return get_internal<VString>(NexusSerializedBytecode::STRING); }
-    _FORCE_INLINE_ Ref<Object>*& get_object() { return get_internal<Ref<Object>>(NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT); }
+    _FORCE_INLINE_ Ref<ManagedObject>*& get_object() { return get_internal<Ref<ManagedObject>>(NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT); }
     StackStruct*& get_struct();
 };
 

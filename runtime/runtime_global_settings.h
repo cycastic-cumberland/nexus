@@ -9,6 +9,7 @@
 
 struct NexusRuntimeGlobalSettings {
     uint32_t stack_size;
+    uint32_t stack_metadata_initial_capacity;
     bool bytecode_endian_mode;
 
     uint8_t task_scheduler_max_request_per_cycle;

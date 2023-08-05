@@ -1,5 +1,5 @@
 //
-// Taken from https://github.com/mtrebi/thread-pool/blob/master/include/NewThreadPool.h
+// Actually, scratch that! ChatGPT wrote most of this
 //
 
 #ifndef NEXUS_THREAD_POOL_H

@@ -13,7 +13,7 @@ struct NexusAbstractSyntaxToken;
 struct NexusASTSymbol;
 struct NexusASTExpression;
 
-struct NexusAbstractSyntaxToken : public Object {
+struct NexusAbstractSyntaxToken : public ManagedObject {
 
 };
 

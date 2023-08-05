@@ -20,9 +20,16 @@ TaskScheduler* TaskScheduler::singleton = nullptr;
 
 
 std::future<void> TaskScheduler::queue_task_internal(const Ref<Task> &p_task) {
+    // Duplicate the pointer to avoid lost in-transit
     auto ticket = TASK_SCHEDULER->thread_pool->queue_task((ThreadPool::Priority)p_task->get_priority(),
-                                                          [p_task]() -> void { TaskScheduler::task_handler(p_task); });
+                                                          [](Ref<Task> duplicated_task_ptr) -> void { TaskScheduler::task_handler(duplicated_task_ptr); },
+                                                          p_task);
     return ticket;
+}
+
+void TaskScheduler::freeze_task(const Ref<Task>& p_from_task, const Ref<Task>& p_to_task) {
+    TS_W
+    TASK_SCHEDULER->frozen_tasks[p_to_task] = p_from_task;
 }
 
 std::future<void> TaskScheduler::queue_task(const Ref<Task> &p_task) {
@@ -38,18 +45,19 @@ TaskScheduler::TaskScheduler() {
 
 void TaskScheduler::task_handler(const Ref<Task>& p_current_task) {
     auto current_task = p_current_task;
+    // If there's no branched task, it should do nothing
     current_task->handle_resume();
+    // Return a tuple
     auto result = current_task->execute();
     Task::AsyncCallbackReturn async_return = Task::EXITED_SAFELY;
-    Ref<Task> branched_into = Ref<Task>::null();
-    result.unpack(async_return, branched_into);
+    Ref<Task> branched_task = Ref<Task>::null();
+    result.unpack(async_return, branched_task);
     switch (async_return) {
         case Task::EXITED_SAFELY:{
+            // Lock guard
             TS_W
-            if (!TASK_SCHEDULER->frozen_tasks.has(current_task)){
-                // This is a genesis task, do nothing
-            } else {
-                // This is spawned from another task, resuming it
+            if (TASK_SCHEDULER->frozen_tasks.has(current_task)) {
+                // current_task is spawned from another task, resuming root task
                 TASK_SCHEDULER->frozen_tasks.erase(current_task);
                 queue_task_internal(TASK_SCHEDULER->frozen_tasks[current_task]);
             }
@@ -58,10 +66,9 @@ void TaskScheduler::task_handler(const Ref<Task>& p_current_task) {
         }
         case Task::AWAIT: {
             // Set this request's child task as the branched task's task object
-            current_task->set_child_task(branched_into);
-            TS_W
-            TASK_SCHEDULER->frozen_tasks[branched_into] = current_task;
-            queue_task_internal(branched_into);
+            current_task->set_child_task(branched_task);
+            freeze_task(current_task, branched_task);
+            queue_task_internal(branched_task);
             break;
         }
         case Task::EXCEPTION_THROWN:

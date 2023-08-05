@@ -25,6 +25,11 @@ private:
     size_t cap{};
     size_t entries_count{};
     KeyPairValue** entries{};
+public:
+    _FORCE_INLINE_ uint32_t get_index(const Key& p_key) const {
+        return Hasher::hash(p_key) % cap;
+    }
+private:
     KeyPairValue* try_get(const Key& p_key) const {
         auto hash = get_index(p_key);
         auto entry = entries[hash];
@@ -55,15 +60,16 @@ private:
         return new_entry;
     }
     bool try_erase(const Key& p_key) noexcept {
-        auto hash = get_index(p_key);
-        auto entry = entries[hash];
+        auto idx = get_index(p_key);
+        auto hash = Hasher::hash(p_key);
+        auto entry = entries[idx];
         KeyPairValue* prev = nullptr;
         if (!entry) return false;
         while (entry){
             // Check hash first before comparing
-            if (Hasher::hash(p_key) == Hasher::hash(entry->key) && Comparator::compare(entry->key, p_key)) {
+            if (hash == Hasher::hash(entry->key) && Comparator::compare(entry->key, p_key)) {
                 if (prev) prev->next = entry->next;
-                else entries[hash] = entry->next;
+                else entries[idx] = entry->next;
                 delete entry;
                 entries_count--;
                 return true;
@@ -82,6 +88,7 @@ private:
         for (size_t i = 0; i < cap; i++){
             entries[i] = nullptr;
         }
+        entries_count = 0;
     }
     KeyPairValue* get_next_ptr(KeyPairValue* p_ptr = nullptr){
         int64_t current_index = -1;
@@ -169,9 +176,6 @@ private:
         }
     }
 public:
-    _FORCE_INLINE_ uint32_t get_index(const Key& p_key) const {
-        return Hasher::hash(p_key) % capacity();
-    }
     _FORCE_INLINE_ const Value& operator[](const Key& p_key) const { return get(p_key)->value; }
     _FORCE_INLINE_ Value& operator[](const Key& p_key) { return get_or_create(p_key)->value; }
     _NO_DISCARD_ _FORCE_INLINE_ bool exists(const Key& p_key) const { return try_get(p_key) != nullptr; }
@@ -184,6 +188,12 @@ public:
     }
     _FORCE_INLINE_ bool erase(const Key& p_key) noexcept { return try_erase(p_key); }
     _FORCE_INLINE_ void clear() { reset_table(); }
+    _FORCE_INLINE_ bool try_get(const Key& p_key, Value& p_value) const {
+        auto pair = try_get(p_key);
+        if (pair == nullptr) return false;
+        p_value = pair->value;
+        return true;
+    }
     explicit StaticHashMap(const size_t& starting_capacity = 150){
         cap = starting_capacity;
         entries = array_alloc<KeyPairValue*>(cap);
@@ -289,10 +299,15 @@ public:
         if (!is_initialized()) return false;
         return current_map->erase(p_key);
     }
+    _FORCE_INLINE_ bool try_get(const Key& p_key, Value& p_value) const {
+        if (!is_initialized()) return false;
+        return current_map->try_get(p_key, p_value);
+    }
     explicit HashMap(const float& growth = 0.75){
         growth_factor = growth;
     }
     HashMap(const HashMap& p_other) : HashMap() {
+        growth_factor = p_other.growth_factor;
         copy(p_other);
     }
 };

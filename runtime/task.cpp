@@ -3,14 +3,16 @@
 //
 
 #include "../language/bytecode.h"
-#include "memory_stack.h"
+#include "nexus_stack.h"
 #include "task.h"
 #include "task_scheduler.h"
 
 NexusExecutionState::~NexusExecutionState() { delete thread_stack; }
 
 NexusExecutionState::NexusExecutionState(const Ref<NexusMethodPointer> &p_method_pointer) : method_pointer(p_method_pointer) {
-    thread_stack = new MemoryStack();
+    thread_stack = new NexusStack(p_method_pointer->get_type_info_server(),
+                                  NexusRuntimeGlobalSettings::get_settings()->stack_size,
+                                  NexusRuntimeGlobalSettings::get_settings()->stack_metadata_initial_capacity);
 }
 
 uint32_t Task::hash(const Task *p_task) { return p_task->get_id(); }

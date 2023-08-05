@@ -30,7 +30,6 @@ private:
     SafeNumeric<uint32_t> task_id_allocator{0};
     SafeFlag is_terminating{false};
     HashMap<Ref<Task>, Ref<Task>, 32, Task, Task> frozen_tasks{};
-    HashMap<uint32_t, Ref<Task>> in_transit_tasks{};
     ThreadPool* thread_pool;
 
     static _ALWAYS_INLINE_ TaskScheduler* get_singleton() { return singleton; }
@@ -41,6 +40,7 @@ private:
 
     friend class Task;
     static std::future<void> queue_task_internal(const Ref<Task>& p_task);
+    static void freeze_task(const Ref<Task>& p_from_task, const Ref<Task>& p_to_task);
 public:
     static std::future<void> queue_task(const Ref<Task>& p_task);
 

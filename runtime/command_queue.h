@@ -37,8 +37,9 @@ public:
         server.join();
     }
     _FORCE_INLINE_ ManagedThread::ID get_server_id() { return server.get_id(); }
+
     template<typename F, typename...Args>
-    auto queue_task(F&& f, Args&&... args) -> std::future<decltype(f(args...))> {
+    auto dispatch(F&& f, Args&&... args) -> std::future<decltype(f(args...))> {
         std::function<decltype(f(args...))()> func = std::bind(std::forward<F>(f), std::forward<Args>(args)...);
         auto task_ptr = std::make_shared<std::packaged_task<decltype(f(args...))()>>(func);
         {

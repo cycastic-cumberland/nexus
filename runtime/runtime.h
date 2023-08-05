@@ -13,13 +13,14 @@ public:
     explicit RuntimeException(const CharString& p_msg) : Exception(p_msg) {}
 };
 
-class NexusRuntime : public Object {
+class NexusRuntime : public ManagedObject {
 public:
 private:
     HashMap<VString, Ref<NexusBytecodeInstance>> bytecode_instances{};
     HashMap<VString, Ref<NexusBytecodeInstance>> bytecode_method_bodies{};
     RWLock rwlock{};
     SafeNumeric<uint32_t> anonymous_instances_count{};
+    TypeInfoServer* type_info_server;
 
     void cache_method_bodies(const Ref<NexusBytecodeInstance>& instance);
 public:

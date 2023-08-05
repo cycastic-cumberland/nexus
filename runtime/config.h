@@ -20,6 +20,7 @@ static NexusRuntimeGlobalSettings* nexus_settings = nullptr;
 static void initialize_nexus_runtime(bool initialize_wcout){
     nexus_settings = new NexusRuntimeGlobalSettings{
         .stack_size = 1024 * 1024 * 16, // 16 MiB
+        .stack_metadata_initial_capacity = 8, // 1024 stack objects before relocation
         .bytecode_endian_mode = false,
         .task_scheduler_max_request_per_cycle = 3,
         .task_scheduler_starting_thread_count = 3,

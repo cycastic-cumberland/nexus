@@ -9,14 +9,14 @@
 #include "../core/types/tuple.h"
 
 class TaskScheduler;
-class MemoryStack;
+class NexusStack;
 class Task;
 class NexusMethodPointer;
 struct AmbiguousValue;
 
 struct NexusExecutionState {
 public:
-    MemoryStack *thread_stack;
+    NexusStack *thread_stack;
     Ref<NexusMethodPointer> method_pointer;
 
     explicit NexusExecutionState(const Ref<NexusMethodPointer>& p_method_pointer);
@@ -25,7 +25,7 @@ public:
 
 class TaskScheduler;
 
-class Task : public Object {
+class Task : public ManagedObject {
 public:
     enum AsyncCallbackReturn {
         EXITED_SAFELY,
