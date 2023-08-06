@@ -130,7 +130,7 @@ public:
         inner_ptr = p_other.inner_ptr;
         return *this;
     }
-    _FORCE_INLINE_ void clear_reference() { inner_ptr = nullptr; }
+    _FORCE_INLINE_ void clear_reference() { inner_ptr = Ref<Box<T, RefCounter>::InnerPointer>::null(); }
     Box() : inner_ptr() {}
     Box(const T& p_data) {
         inner_ptr = Ref<Box<T, RefCounter>::InnerPointer>::make_ref(p_data);
@@ -146,4 +146,5 @@ public:
     }
     ~Box() = default;
 };
+
 #endif //NEXUS_OBJECT_H

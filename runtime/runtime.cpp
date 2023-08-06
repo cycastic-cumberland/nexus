@@ -6,7 +6,7 @@
 #include "nexus_stack.h"
 #include "../core/types/linked_list.h"
 
-NexusRuntime::NexusRuntime() : ManagedObject(), type_info_server(new TypeInfoServer(true)) {
+NexusRuntime::NexusRuntime() : ManagedObject(), type_info_server(new NexusTypeInfoServer(true)) {
     anonymous_instances_count.set(0);
 }
 

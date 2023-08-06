@@ -8,6 +8,7 @@
 #include <thread>
 #include "../core/typedefs.h"
 #include "../core/types/vstring.h"
+#include "../core/cmd_handler.h"
 #include "managed_thread.h"
 
 class SystemException : public Exception {
@@ -22,6 +23,7 @@ protected:
 public:
     static _FORCE_INLINE_ System* get_singleton() { return singleton; }
     static _FORCE_INLINE_ void cleanup() { delete singleton; }
+    virtual VString get_executable_path() { return CmdHandler::args()[0]; }
     virtual void load_dynamic_library(const VString& p_lib_path, void*& p_library_handle, const bool& p_also_set_library_path = false){
         throw SystemException("Unavailable");
     }

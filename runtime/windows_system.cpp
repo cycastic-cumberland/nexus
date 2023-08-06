@@ -2,14 +2,12 @@
 // Created by cycastic on 7/22/2023.
 //
 
+#if defined(_WIN32) || defined(_WIN64)
+
 #include "windows_system.h"
 #include "../core/io/file_access_server.h"
-
-
-#if defined(_WIN32) || defined(_WIN64)
 #include <dwmapi.h>
 #include <shellapi.h>
-#endif
 
 static VString format_error_message(DWORD id) {
     LPWSTR messageBuffer = NULL;
@@ -74,3 +72,4 @@ void WindowsSystem::print_line(const VString &p_message) {
 }
 
 WindowsSystem::~WindowsSystem() = default;
+#endif

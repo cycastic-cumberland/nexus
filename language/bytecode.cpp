@@ -24,7 +24,7 @@ void NexusBytecode::load_header(const FilePointer &p_file) {
 //    COLLECT_CONSTANTS(get_float, f32_constants)
 //    COLLECT_CONSTANTS(get_double, f64_constants)
 //    COLLECT_CONSTANTS(get_string, string_literals)
-    // Read method metadata_collection
+    // Read method metadata_record
     auto method_count = p_file->get_32();
     methods_metadata = Vector<Ref<NexusBytecodeMethodMetadata>>(method_count);
     for (int i = 0; i < method_count; i++){
@@ -76,7 +76,7 @@ void NexusBytecode::serialize(FilePointer &p_file) const {
 //    STORE_CONSTANTS(store_float, f32_constants)
 //    STORE_CONSTANTS(store_double, f64_constants)
 //    STORE_CONSTANTS(store_string, string_literals)
-    // Store methods metadata_collection
+    // Store methods metadata_record
     p_file->store_32(methods_metadata.size());
     for (const auto& item : methods_metadata){
         item->serialize(p_file);
@@ -92,7 +92,7 @@ void NexusBytecode::serialize(FilePointer &p_file) const {
         method_body_offset_loc[body->method_name] = (uint64_t)p_file->get_pos();
         body->serialize(p_file);
     }
-    // Replace offsets from metadata_collection with actual offsets
+    // Replace offsets from metadata_record with actual offsets
     auto it = method_body_offset_loc.const_iterator();
     while (it.move_next()){
         auto metadata_offset = method_metadata_offset_loc[it.get_pair().key];
@@ -250,7 +250,7 @@ void NexusBytecodeMethodBody::serialize(FilePointer& p_file) const {
     }
 }
 
-NexusBytecodeInstance::NexusBytecodeInstance(const TypeInfoServer* p_type_info_server, const FilePointer &p_fp, NexusBytecodeInstance::BytecodeLoadMode p_load_mode)
+NexusBytecodeInstance::NexusBytecodeInstance(const NexusTypeInfoServer* p_type_info_server, const FilePointer &p_fp, NexusBytecodeInstance::BytecodeLoadMode p_load_mode)
 : NexusBytecodeInstance(p_type_info_server) {
     load_mode = p_load_mode;
     bytecode = Ref<NexusBytecode>::make_ref();
@@ -276,7 +276,7 @@ NexusBytecodeInstance::NexusBytecodeInstance(const TypeInfoServer* p_type_info_s
     }
 }
 
-NexusBytecodeInstance::NexusBytecodeInstance(const TypeInfoServer* p_type_info_server, const VString &p_bc_path,
+NexusBytecodeInstance::NexusBytecodeInstance(const NexusTypeInfoServer* p_type_info_server, const VString &p_bc_path,
                                              NexusBytecodeInstance::BytecodeLoadMode p_load_mode)
         : NexusBytecodeInstance(p_type_info_server) {
     load_mode = p_load_mode;
@@ -299,19 +299,22 @@ NexusBytecodeInstance::NexusBytecodeInstance(const TypeInfoServer* p_type_info_s
     }
 }
 
-NexusMethodPointer::NexusMethodPointer(const TypeInfoServer* p_type_info_server) : type_info_server(p_type_info_server) {}
+NexusMethodPointer::NexusMethodPointer(const NexusTypeInfoServer* p_type_info_server) : type_info_server(p_type_info_server) {}
 
-const TypeInfoServer *NexusMethodPointer::get_type_info_server() const {
+const NexusTypeInfoServer *NexusMethodPointer::get_type_info_server() const {
     return type_info_server;
 }
 
 void NexusMethodPointerJIT::load_method(const Ref<NexusBytecodeInstance>& p_bci, const VString& p_method_name) {
     file = FileAccessServer::duplicate_pointer(p_bci->file_pointer);
-    auto pos = p_bci->bodies_location[p_method_name];
-    file->seek(pos);
-    offsets.push_back(pos);
+
     method_body = Ref<NexusBytecodeMethodBody>::make_ref();
     method_body->read_header(file);
+
+    auto pos = p_bci->bodies_location[p_method_name];
+    file->seek(pos);
+    offsets = Vector<size_t>(method_body->get_instructions_count());
+    offsets.push_back(pos);
     method_metadata = p_bci->bytecode->get_metadata_map()[method_body->method_name];
 }
 

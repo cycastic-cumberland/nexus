@@ -13,7 +13,7 @@
 #include "../runtime/runtime_global_settings.h"
 
 struct StackStructMetadata;
-class TypeInfoServer;
+class NexusTypeInfoServer;
 
 class BytecodeException : public Exception {
 public:
@@ -28,7 +28,7 @@ public:
     explicit BytecodeParseException(const char* message) : BytecodeException(message) {}
 };
 
-struct NexusSerializedBytecode : public ManagedObject {
+struct NexusSerializedBytecode : public UnsafeObject {
 public:
     enum DataType : unsigned char {
         STACK_STRUCT,
@@ -267,6 +267,8 @@ public:
 
     void read_header(const FilePointer& p_file);
     static Ref<NexusBytecodeRawInstruction> read_next_instruction(const FilePointer& p_file);
+
+    _NO_DISCARD_ _FORCE_INLINE_ uint32_t get_instructions_count() const { return instructions.capacity(); }
 };
 
 class NexusBytecode : public NexusSerializedBytecode {
@@ -282,7 +284,7 @@ private:
 //    Vector<float> f32_constants{};
 //    Vector<double> f64_constants{};
 //    Vector<VString> string_literals{};
-    // Method metadata_collection
+    // Method metadata_record
     Vector<Ref<NexusBytecodeMethodMetadata>> methods_metadata{};
     Vector<Ref<NexusBytecodeMethodBody>> method_bodies{};
     HashMap<VString, Ref<NexusBytecodeMethodMetadata>> metadata_map{};
@@ -325,9 +327,9 @@ struct NexusBytecodeInstance;
 
 struct NexusMethodPointer : public ManagedObject {
 private:
-    const TypeInfoServer* type_info_server;
+    const NexusTypeInfoServer* type_info_server;
 public:
-    explicit NexusMethodPointer(const TypeInfoServer* p_type_info_server);
+    explicit NexusMethodPointer(const NexusTypeInfoServer* p_type_info_server);
 
     virtual int64_t get_iterator() const = 0;
     virtual void move_iterator(const int64_t& p_new_pos) = 0;
@@ -337,7 +339,7 @@ public:
     
     virtual void load_method(const Ref<NexusBytecodeInstance>& p_bci, const VString& p_method_name) = 0;
 
-    const TypeInfoServer* get_type_info_server() const;
+    const NexusTypeInfoServer* get_type_info_server() const;
 };
 
 struct NexusMethodPointerJIT : public NexusMethodPointer {
@@ -348,7 +350,7 @@ private:
     Vector<size_t> offsets{};
     int64_t instructions_iter = -1;
 public:
-    explicit NexusMethodPointerJIT(const TypeInfoServer* p_type_info_server) : NexusMethodPointer(p_type_info_server) {}
+    explicit NexusMethodPointerJIT(const NexusTypeInfoServer* p_type_info_server) : NexusMethodPointer(p_type_info_server) {}
 
     int64_t get_iterator() const override { return instructions_iter; }
     void move_iterator(const int64_t& p_new_pos) override;
@@ -365,7 +367,7 @@ private:
     Ref<NexusBytecodeMethodMetadata> method_metadata{};
     int64_t instructions_iter = -1;
 public:
-    explicit NexusMethodPointerMemory(const TypeInfoServer* p_type_info_server) : NexusMethodPointer(p_type_info_server) {}
+    explicit NexusMethodPointerMemory(const NexusTypeInfoServer* p_type_info_server) : NexusMethodPointer(p_type_info_server) {}
 
     int64_t get_iterator() const override { return instructions_iter; }
     void move_iterator(const int64_t& p_new_pos) override { instructions_iter = p_new_pos; }
@@ -384,17 +386,17 @@ public:
     };
 private:
     mutable BinaryMutex lock{};
-    const TypeInfoServer* type_info_server;
+    const NexusTypeInfoServer* type_info_server;
 
-    explicit NexusBytecodeInstance(const TypeInfoServer* p_type_info_server) : type_info_server(p_type_info_server) {}
+    explicit NexusBytecodeInstance(const NexusTypeInfoServer* p_type_info_server) : type_info_server(p_type_info_server) {}
 public:
     BytecodeLoadMode load_mode;
     FilePointer file_pointer;
     Ref<NexusBytecode> bytecode;
     HashMap<VString, size_t> bodies_location{};
     uint64_t header_end{};
-    NexusBytecodeInstance(const TypeInfoServer* p_type_info_server, const FilePointer& p_fp, BytecodeLoadMode p_load_mode);
-    NexusBytecodeInstance(const TypeInfoServer* p_type_info_server, const VString& p_bc_path, BytecodeLoadMode p_load_mode);
+    NexusBytecodeInstance(const NexusTypeInfoServer* p_type_info_server, const FilePointer& p_fp, BytecodeLoadMode p_load_mode);
+    NexusBytecodeInstance(const NexusTypeInfoServer* p_type_info_server, const VString& p_bc_path, BytecodeLoadMode p_load_mode);
 
     _FORCE_INLINE_ Ref<NexusMethodPointer> get_method(const VString& p_method_name) const {
         GUARD(lock);

@@ -47,6 +47,10 @@ public:
     _NO_DISCARD_ bool is_network_share_path() const;
     _NO_DISCARD_ VString replace(const char *p_key, const char *p_with) const;
     _NO_DISCARD_ VString get_base_dir() const;
+    _NO_DISCARD_ bool is_absolute_path() const;
+    _NO_DISCARD_ _FORCE_INLINE_ bool is_relative_path() const { return !is_absolute_path(); }
+    _NO_DISCARD_ VString plus_file(const VString& p_file) const;
+    _NO_DISCARD_ VString get_file() const;
     CharString utf8() const;
     static _FORCE_INLINE_ VString from_utf8(const char *p_utf8, int p_len = -1, bool p_skip_cr = false){
         VString re{};

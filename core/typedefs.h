@@ -7,6 +7,7 @@
 
 #include <cstdlib>
 #include <type_traits>
+#include <cstdint>
 #include "memf.h"
 
 // Stolen from Godot

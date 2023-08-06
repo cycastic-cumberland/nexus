@@ -7,6 +7,10 @@
 
 #if defined(_WIN32) || defined(_WIN64)
 #include "windows_system.h"
+#elif defined(__linux__)
+#include "unix_system.h"
+#else
+#include "system.h"
 #endif
 
 #include "runtime_global_settings.h"
@@ -28,6 +32,10 @@ static void initialize_nexus_runtime(bool initialize_wcout){
     NexusRuntimeGlobalSettings::set_singleton(nexus_settings);
 #if defined(_WIN32) || defined(_WIN64)
     nexus_system = new WindowsSystem();
+#elif defined(__linux__)
+    nexus_system = new UnixSystem();
+#else
+    nexus_system = nullptr;
 #endif
     task_scheduler = new TaskScheduler();
 

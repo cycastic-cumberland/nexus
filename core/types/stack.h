@@ -48,6 +48,7 @@ private:
         while (!buffer->empty()){
             push(buffer->pop());
         }
+        delete buffer;
     }
 public:
     void push(const T& p_value) override {

@@ -15,10 +15,15 @@ class InternedString;
 struct StackItemMetadata;
 struct StackStructItemMetadata;
 
-typedef void (*struct_constructor_cb)(const StackItemMetadata*, void*);
-typedef void (*struct_copy_constructor_cb)(const StackItemMetadata*, void*, const void*);
-typedef void (*struct_assignment_cb)(const StackItemMetadata*, void*, const void*);
+typedef void (*constructor_cb)(const StackItemMetadata*, void*);
+typedef void (*copy_constructor_cb)(const StackItemMetadata*, void*, const void*);
 typedef void (*destructor_cb)(const StackItemMetadata*, void*);
+typedef void (*op_assign_cb)(const StackItemMetadata*, void*, const void*);
+typedef void (*op_equal_cb)(const StackItemMetadata*, const void*, const void*, bool*);
+typedef void (*op_greater_cb)(const StackItemMetadata*, const void*, const void*, bool*);
+typedef void (*op_greater_or_equal_cb)(const StackItemMetadata*, const void*, const void*, bool*);
+typedef void (*op_lesser_cb)(const StackItemMetadata*, const void*, const void*, bool*);
+typedef void (*op_lesser_or_equal_cb)(const StackItemMetadata*, const void*, const void*, bool*);
 
 template<class T>
 static _FORCE_INLINE_ void generic_constructor(const StackItemMetadata* ignored, void* p_data){
@@ -46,6 +51,32 @@ static _FORCE_INLINE_ void generic_destructor(const StackItemMetadata* ignored, 
     casted->~T();
 }
 
+struct NexusBaseVtable {
+    typedef uint64_t ID;
+
+    const NexusBaseVtable* parent_vtable{};
+
+    const constructor_cb constructor;
+    const copy_constructor_cb copy_constructor;
+    const destructor_cb destructor;
+
+    const op_assign_cb op_assign;
+    const op_equal_cb op_equal{};
+    const op_greater_cb op_greater{};
+    const op_greater_or_equal_cb op_greater_or_equal{};
+    const op_lesser_cb op_lesser{};
+    const op_lesser_or_equal_cb op_lesser_or_equal{};
+
+    virtual ~NexusBaseVtable() = default;
+    NexusBaseVtable(constructor_cb p_con,
+                    copy_constructor_cb p_copy_con,
+                    op_assign_cb p_op_assign,
+                    destructor_cb p_destructor,
+                    const NexusBaseVtable* p_parent = nullptr)
+            : constructor(p_con), copy_constructor(p_copy_con),
+              op_assign(p_op_assign), destructor(p_destructor), parent_vtable(p_parent) {}
+
+};
 
 struct StackItemMetadata {
     typedef uint64_t ID;
@@ -55,26 +86,17 @@ struct StackItemMetadata {
 
     NexusSerializedBytecode::DataType type;
     size_t data_size;
-    struct_constructor_cb constructor;
-    struct_copy_constructor_cb copy_constructor;
-    struct_assignment_cb assignment_operator;
-    destructor_cb destructor;
+    const NexusBaseVtable* vtable;
 
     virtual ~StackItemMetadata() = default;
     StackItemMetadata(const ID& p_id,
                       const NexusSerializedBytecode::DataType& p_type,
                       const size_t& p_total_size,
-                      struct_constructor_cb p_con,
-                      struct_copy_constructor_cb p_copy_con,
-                      struct_assignment_cb p_assign,
-                      destructor_cb p_destructor)
+                      const NexusBaseVtable* p_vtable)
                       : type_id(p_id),
                         type(p_type),
                         data_size(p_total_size),
-                        constructor(p_con),
-                        copy_constructor(p_copy_con),
-                        assignment_operator(p_assign),
-                        destructor(p_destructor) {}
+                        vtable(p_vtable) {}
 };
 
 struct StackStructItemMetadata : public StackItemMetadata {
@@ -92,76 +114,85 @@ public:
     StackStructItemMetadata(const ID& p_id,
                             const NexusSerializedBytecode::DataType& p_type,
                             const size_t& p_total_size,
-                            struct_constructor_cb p_con,
-                            struct_copy_constructor_cb p_copy_con,
-                            struct_assignment_cb p_assign,
-                            destructor_cb p_destructor,
+                            const NexusBaseVtable* p_vtable,
                             const LinkedList<const StackItemMetadata*>& p_struct_items)
-                            : StackItemMetadata(p_id, p_type, p_total_size, p_con, p_copy_con, p_assign, p_destructor),
+                            : StackItemMetadata(p_id, p_type, p_total_size, p_vtable),
                             struct_items(p_struct_items) { build_cache(); }
     StackStructItemMetadata(const ID& p_id,
                             const NexusSerializedBytecode::DataType& p_type,
                             const size_t& p_total_size,
-                            struct_constructor_cb p_con,
-                            struct_copy_constructor_cb p_copy_con,
-                            struct_assignment_cb p_assign,
-                            destructor_cb p_destructor,
+                            const NexusBaseVtable* p_vtable,
                             LinkedList<const StackItemMetadata*>&& p_struct_items)
-                            : StackItemMetadata(p_id, p_type, p_total_size, p_con, p_copy_con, p_assign, p_destructor),
-                            struct_items(p_struct_items) { build_cache(); }
-    StackStructItemMetadata(const ID& p_id,
-                            const NexusSerializedBytecode::DataType& p_type,
-                            const size_t& p_total_size,
-                            const LinkedList<const StackItemMetadata*>& p_struct_items)
-                            : StackItemMetadata(p_id, p_type, p_total_size,
-                                                default_struct_constructor,
-                                                default_struct_copy_constructor,
-                                                default_assignment_operator,
-                                                default_struct_destructor),
-                            struct_items(p_struct_items) { build_cache(); }
-    StackStructItemMetadata(const ID& p_id,
-                            const NexusSerializedBytecode::DataType& p_type,
-                            const size_t& p_total_size,
-                            LinkedList<const StackItemMetadata*>&& p_struct_items)
-                            : StackItemMetadata(p_id, p_type, p_total_size,
-                                                default_struct_constructor,
-                                                default_struct_copy_constructor,
-                                                default_assignment_operator,
-                                                default_struct_destructor),
+                            : StackItemMetadata(p_id, p_type, p_total_size, p_vtable),
                             struct_items(p_struct_items) { build_cache(); }
 };
 
-class TypeInfoServer {
+class NexusTypeInfoServer {
 private:
     mutable RWLock* lock{};
-    LinkedList<StackItemMetadata*> metadata_collection{};
-    HashMap<StackItemMetadata::ID, const StackItemMetadata*> by_id{};
-    SafeNumeric<StackItemMetadata::ID> id_allocator{};
+    LinkedList<StackItemMetadata*> metadata_record{};
+    LinkedList<NexusBaseVtable*> vtable_record{};
+    HashMap<StackItemMetadata::ID, const StackItemMetadata*> metadata_map{};
+    HashMap<NexusBaseVtable::ID, const NexusBaseVtable*> vtable_map{};
+    SafeNumeric<StackItemMetadata::ID> metadata_id_allocator{};
+    SafeNumeric<NexusBaseVtable::ID> vtable_id_allocator{};
 
     void add_builtin_types();
     StackItemMetadata::ID add_metadata(StackItemMetadata* p_metadata, const StackItemMetadata::ID& p_id);
+    NexusBaseVtable::ID add_vtable(NexusBaseVtable* p_vtable, const NexusBaseVtable::ID& p_id);
 public:
-    explicit TypeInfoServer(bool p_is_multi_threaded = true);
-    ~TypeInfoServer();
+    explicit NexusTypeInfoServer(bool p_is_multi_threaded = true);
+    ~NexusTypeInfoServer();
 
     template<class T, class ...Args>
-    _FORCE_INLINE_ StackItemMetadata::ID add_derived_type(Args ...args){
+    _FORCE_INLINE_ StackItemMetadata::ID add_derived_type(Args&& ...args){
         W_GUARD(lock);
         auto new_metadata = new T(args...);
-        return add_metadata(new_metadata, id_allocator.increment());
+        return add_metadata(new_metadata, metadata_id_allocator.increment());
     }
     template<class ...Args>
-    _FORCE_INLINE_ StackItemMetadata::ID add_struct_type(Args... args){
+    _FORCE_INLINE_ StackItemMetadata::ID add_struct_type(Args&& ...args){
         return add_derived_type<StackStructItemMetadata>(0, NexusSerializedBytecode::STACK_STRUCT, 0, args...);
+    }
+    template<class T, class ...Args>
+    _FORCE_INLINE_ NexusBaseVtable::ID add_custom_vtable(Args&& ...args){
+        W_GUARD(lock);
+        auto new_vtable = new T(args...);
+        return add_vtable(new_vtable, vtable_id_allocator.increment());
+    }
+    template<class ...Args>
+    _FORCE_INLINE_ NexusBaseVtable::ID add_struct_based_vtable(Args&& ...args){
+        W_GUARD(lock);
+        auto new_vtable = new NexusBaseVtable(StackStructItemMetadata::default_struct_constructor,
+                                              StackStructItemMetadata::default_struct_copy_constructor,
+                                              StackStructItemMetadata::default_assignment_operator,
+                                              StackStructItemMetadata::default_struct_destructor,
+                                              args...);
+        return add_vtable(new_vtable, vtable_id_allocator.increment());
     }
     _FORCE_INLINE_ const StackItemMetadata* get_metadata_by_id(const StackItemMetadata::ID& p_id) const {
         const StackItemMetadata* re = nullptr;
         R_GUARD(lock);
-        by_id.try_get(p_id, re);
+        metadata_map.try_get(p_id, re);
         return re;
     }
     _FORCE_INLINE_ const StackItemMetadata* get_primitive_metadata(NexusSerializedBytecode::DataType p_data_type) const {
         return get_metadata_by_id((StackItemMetadata::ID)p_data_type);
+    }
+    _FORCE_INLINE_ const NexusBaseVtable* get_vtable_by_id(const NexusBaseVtable::ID& p_id) const {
+        const NexusBaseVtable* re = nullptr;
+        R_GUARD(lock);
+        vtable_map.try_get(p_id, re);
+        return re;
+    }
+//    _FORCE_INLINE_ NexusBaseVtable* get_vtable_by_id(const NexusBaseVtable::ID& p_id) {
+//        const NexusBaseVtable* re = nullptr;
+//        R_GUARD(lock);
+//        vtable_map.try_get(p_id, re);
+//        return const_cast<NexusBaseVtable*>(re);
+//    }
+    _FORCE_INLINE_ const NexusBaseVtable* get_primitive_vtable(NexusSerializedBytecode::DataType p_data_type) const {
+        return get_vtable_by_id((NexusBaseVtable::ID)p_data_type);
     }
 };
 
@@ -182,7 +213,7 @@ public:
             return type && data;
         }
         _FORCE_INLINE_ void set_primitive(const void* p_from_data) const {
-            type->assignment_operator(type, data, p_from_data);
+            type->vtable->op_assign(type, data, p_from_data);
         }
     };
     class Frame {
@@ -198,7 +229,7 @@ public:
         void push_object(const StackItemMetadata* p_metadata, const void* p_data);
 
         template<class T>
-        void set_primitive(const int64_t &p_idx, const T &p_data);
+        void set_primitive(const int64_t &p_idx, const NexusSerializedBytecode::DataType &p_type, const T &p_data) const;
 
         static void set_object(const ObjectInfo& p_info, const StackItemMetadata* p_metadata, const void* p_data);
         void register_object(const StackItemMetadata* p_metadata);
@@ -207,6 +238,8 @@ public:
         Frame(const Frame& p_other) = delete;
         Frame(Frame&& p_other) noexcept;
         ~Frame();
+
+        void push(const ObjectInfo& p_info);
         void push_empty(const StackItemMetadata* p_metadata);
         void push(const StackItemMetadata* p_metadata, const void* p_copy_from);
         void push(const uint32_t& p_u32);
@@ -220,17 +253,18 @@ public:
         void push(const VString& p_string);
         void push(const Ref<ManagedObject>& p_ref_counted);
 
-        void set(const int64_t& p_idx, const StackItemMetadata* p_metadata, const void* p_copy_from);
-        void set(const int64_t& p_idx, const uint32_t& p_u32);
-        void set(const int64_t& p_idx, const int32_t& p_i32);
-        void set(const int64_t& p_idx, const uint64_t& p_u64);
-        void set(const int64_t& p_idx, const int64_t& p_i64);
-        void set(const int64_t& p_idx, const float& p_f32);
-        void set(const int64_t& p_idx, const double & p_f64);
-        void set(const int64_t& p_idx, const wchar_t* p_str);
-        void set(const int64_t& p_idx, const InternedString& p_str);
-        void set(const int64_t& p_idx, const VString& p_string);
-        void set(const int64_t& p_idx, const Ref<ManagedObject>& p_ref_counted);
+        void set(const int64_t& p_idx, const ObjectInfo& p_info) const;
+        void set(const int64_t& p_idx, const StackItemMetadata* p_metadata, const void* p_copy_from) const;
+        void set(const int64_t& p_idx, const uint32_t& p_u32) const;
+        void set(const int64_t& p_idx, const int32_t& p_i32) const;
+        void set(const int64_t& p_idx, const uint64_t& p_u64) const;
+        void set(const int64_t& p_idx, const int64_t& p_i64) const;
+        void set(const int64_t& p_idx, const float& p_f32) const;
+        void set(const int64_t& p_idx, const double & p_f64) const;
+        void set(const int64_t& p_idx, const wchar_t* p_str) const;
+        void set(const int64_t& p_idx, const InternedString& p_str) const;
+        void set(const int64_t& p_idx, const VString& p_string) const;
+        void set(const int64_t& p_idx, const Ref<ManagedObject>& p_ref_counted) const;
 
         void pop();
         void copy_to_top(const int64_t& p_idx);
@@ -258,15 +292,14 @@ public:
     friend class Frame;
 private:
     const size_t max_stack_size;
-    const size_t initial_frame_capacity;
-    const TypeInfoServer* type_info_server;
+    const NexusTypeInfoServer* type_info_server;
     void* stack_begin;
     size_t allocated;
     size_t current_object_count;
     VectorStack<Frame> stack_frames;
     Vector<ObjectInfo> object_info;
 public:
-    NexusStack(const TypeInfoServer* p_type_info_server, const size_t& p_stack_size, const size_t& p_initial_frame_capacity);
+    NexusStack(const NexusTypeInfoServer* p_type_info_server, const size_t& p_stack_size, const size_t& p_initial_frame_capacity);
     NexusStack(const NexusStack& p_other) = delete;
     ~NexusStack();
 
@@ -291,16 +324,19 @@ template<class T>
 void NexusStack::Frame::push_primitive(const NexusSerializedBytecode::DataType &p_type, const T &p_data) {
     auto metadata = parent->type_info_server->get_primitive_metadata(p_type);
     if (!metadata) throw NexusStackException("Can not find metadata for primitive type, "
-                                             "TypeInfoServer might not have been initialized");
+                                             "NexusTypeInfoServer might not have been initialized");
     if (parent->allocated + metadata->data_size > parent->max_stack_size) throw NexusStackException("Stack overflow");
     push_object(metadata, &p_data);
 }
 
 template<class T>
-void NexusStack::Frame::set_primitive(const int64_t &p_idx, const T &p_data) {
+void NexusStack::Frame::set_primitive(const int64_t &p_idx, const NexusSerializedBytecode::DataType &p_type, const T &p_data) const {
+    auto metadata = parent->type_info_server->get_primitive_metadata(p_type);
+    if (!metadata) throw NexusStackException("Can not find metadata for primitive type, "
+                                             "NexusTypeInfoServer might not have been initialized");
     auto object = get_at(p_idx);
     if (!object.is_valid()) throw NexusStackException("Invalid stack frame index");
-    set_object(object, object.type, &p_data);
+    set_object(object, metadata, &p_data);
 }
 
 #endif //NEXUS_NEXUS_STACK_H

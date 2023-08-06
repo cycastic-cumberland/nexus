@@ -15,7 +15,7 @@ void StackStructItemMetadata::default_struct_constructor(const StackItemMetadata
     size_t offset = 0;
     for (const auto* it = struct_metadata->struct_items.first(); it; it = it->next()){
         auto metadata = it->data;
-        metadata->constructor(metadata, (void*)((size_t)p_mem_region + offset));
+        metadata->vtable->constructor(metadata, (void*)((size_t)p_mem_region + offset));
         offset += metadata->data_size;
     }
 }
@@ -25,7 +25,7 @@ void StackStructItemMetadata::default_struct_copy_constructor(const StackItemMet
     size_t offset = 0;
     for (const auto* it = struct_metadata->struct_items.first(); it; it = it->next()){
         auto metadata = it->data;
-        metadata->copy_constructor(metadata, (void*)((size_t)p_mem_region + offset), (void*)((size_t)p_copy_target_region + offset));
+        metadata->vtable->copy_constructor(metadata, (void*)((size_t)p_mem_region + offset), (void*)((size_t)p_copy_target_region + offset));
         offset += metadata->data_size;
     }
 }
@@ -36,7 +36,7 @@ void StackStructItemMetadata::default_assignment_operator(const StackItemMetadat
     size_t offset = 0;
     for (const auto* it = struct_metadata->struct_items.first(); it; it = it->next()){
         auto metadata = it->data;
-        metadata->assignment_operator(metadata, (void*)((size_t)p_mem_region + offset), (void*)((size_t)p_copy_target_region + offset));
+        metadata->vtable->op_assign(metadata, (void*)((size_t)p_mem_region + offset), (void*)((size_t)p_copy_target_region + offset));
         offset += metadata->data_size;
     }
 }
@@ -46,7 +46,7 @@ void StackStructItemMetadata::default_struct_destructor(const StackItemMetadata 
     size_t offset = 0;
     for (const auto* it = struct_metadata->struct_items.first(); it; it = it->next()){
         auto metadata = it->data;
-        metadata->destructor(metadata, (void*)((size_t)p_mem_region + offset));
+        metadata->vtable->destructor(metadata, (void*)((size_t)p_mem_region + offset));
         offset += metadata->data_size;
     }
 }
@@ -58,62 +58,82 @@ void StackStructItemMetadata::build_cache() {
     }
 }
 
-void TypeInfoServer::add_builtin_types() {
-#define ADD_TYPE(data_type, representation, constructor_cb, copy_constructor_cp, assignment_cb, destructor_cb)      \
+void NexusTypeInfoServer::add_builtin_types() {
+#define ADD_TYPE(data_type, representation, constructor_cb, copy_constructor_cp, assignment_cb, destructor_cb){     \
+    auto vtable = new NexusBaseVtable(constructor_cb, copy_constructor_cp,                                          \
+                                      assignment_cb, destructor_cb);                                                \
+    add_vtable(vtable, (data_type));                                                                                \
     add_metadata(new StackItemMetadata(                                                                             \
         (StackItemMetadata::ID)(data_type),                                                                         \
         (data_type),                                                                                                \
         sizeof(representation),                                                                                     \
-        constructor_cb,                                                                                             \
-        copy_constructor_cp,                                                                                        \
-        assignment_cb,                                                                                              \
-        destructor_cb                                                                                               \
-    ), (data_type))
-    // No STACK_STRUCT, as it should not be situated on the stack, all struct type must have its custom metadata class
+        vtable                                                                                                      \
+    ), (data_type));}
+    {
+        auto vtable = new NexusBaseVtable(StackStructItemMetadata::default_struct_constructor,
+                                          StackStructItemMetadata::default_struct_copy_constructor,
+                                          StackStructItemMetadata::default_assignment_operator,
+                                          StackStructItemMetadata::default_struct_destructor);
+        add_vtable(vtable, NexusSerializedBytecode::STACK_STRUCT);
+    }
+    // No STACK_STRUCT metadata, as it should not be situated on the stack, all struct type must have its custom metadata class
     ADD_TYPE(NexusSerializedBytecode::UNSIGNED_32_BIT_INTEGER, uint32_t, numeric_constructor<uint32_t>,
-             generic_copy_constructor<uint32_t>, generic_copy_assignment<uint32_t>, empty_destructor);
+             generic_copy_constructor<uint32_t>, generic_copy_assignment<uint32_t>, empty_destructor)
     ADD_TYPE(NexusSerializedBytecode::SIGNED_32_BIT_INTEGER, int32_t, numeric_constructor<int32_t>,
-             generic_copy_constructor<int32_t>, generic_copy_assignment<int32_t>, empty_destructor);
+             generic_copy_constructor<int32_t>, generic_copy_assignment<int32_t>, empty_destructor)
     ADD_TYPE(NexusSerializedBytecode::UNSIGNED_64_BIT_INTEGER, uint64_t, numeric_constructor<uint64_t>,
-             generic_copy_constructor<uint64_t>, generic_copy_assignment<uint64_t>, empty_destructor);
+             generic_copy_constructor<uint64_t>, generic_copy_assignment<uint64_t>, empty_destructor)
     ADD_TYPE(NexusSerializedBytecode::UNSIGNED_64_BIT_INTEGER, int64_t, numeric_constructor<int64_t>,
-             generic_copy_constructor<int64_t>, generic_copy_assignment<int64_t>, empty_destructor);
+             generic_copy_constructor<int64_t>, generic_copy_assignment<int64_t>, empty_destructor)
     ADD_TYPE(NexusSerializedBytecode::SINGLE_PRECISION_FLOATING_POINT, float, numeric_constructor<float>,
-             generic_copy_constructor<float>, generic_copy_assignment<float>, empty_destructor);
+             generic_copy_constructor<float>, generic_copy_assignment<float>, empty_destructor)
     ADD_TYPE(NexusSerializedBytecode::DOUBLE_PRECISION_FLOATING_POINT, double, numeric_constructor<double>,
-             generic_copy_constructor<double>, generic_copy_assignment<double>, empty_destructor);
+             generic_copy_constructor<double>, generic_copy_assignment<double>, empty_destructor)
     ADD_TYPE(NexusSerializedBytecode::STRING_LITERAL, InternedString, generic_constructor<InternedString>,
-             generic_copy_constructor<InternedString>, generic_copy_assignment<InternedString>, generic_destructor<InternedString>);
+             generic_copy_constructor<InternedString>, generic_copy_assignment<InternedString>, generic_destructor<InternedString>)
     ADD_TYPE(NexusSerializedBytecode::STRING, VString, generic_constructor<VString>,
-             generic_copy_constructor<VString>, generic_copy_assignment<VString>, generic_destructor<VString>);
+             generic_copy_constructor<VString>, generic_copy_assignment<VString>, generic_destructor<VString>)
     ADD_TYPE(NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT, Ref<ManagedObject>, generic_constructor<Ref<ManagedObject>>,
-             generic_copy_constructor<Ref<ManagedObject>>, generic_copy_assignment<Ref<ManagedObject>>, generic_destructor<Ref<ManagedObject>>);
+             generic_copy_constructor<Ref<ManagedObject>>, generic_copy_assignment<Ref<ManagedObject>>, generic_destructor<Ref<ManagedObject>>)
     ADD_TYPE(NexusSerializedBytecode::METHOD, size_t, numeric_constructor<size_t>,
-             generic_copy_constructor<size_t>, generic_copy_assignment<size_t>, empty_destructor);
+             generic_copy_constructor<size_t>, generic_copy_assignment<size_t>, empty_destructor)
     // No NONE
 
     // Skip an ID? Whatever...
-    id_allocator.set(NexusSerializedBytecode::MAX_TYPE);
+    metadata_id_allocator.set(NexusSerializedBytecode::MAX_TYPE);
+    vtable_id_allocator.set(NexusSerializedBytecode::MAX_TYPE);
 #undef ADD_TYPE
 }
 
-TypeInfoServer::TypeInfoServer(bool p_is_multi_threaded) {
+NexusTypeInfoServer::NexusTypeInfoServer(bool p_is_multi_threaded) {
     lock = p_is_multi_threaded ? new RWLock() : new InertRWLock();
     add_builtin_types();
 }
 
-TypeInfoServer::~TypeInfoServer() {
-    delete lock;
-    while (!metadata_collection.empty()){
-        delete metadata_collection.first()->data;
-        metadata_collection.erase(metadata_collection.first());
+NexusTypeInfoServer::~NexusTypeInfoServer() {
+    lock->write_lock();
+    while (!metadata_record.empty()){
+        delete metadata_record.first()->data;
+        metadata_record.erase(metadata_record.first());
     }
+    while (!vtable_record.empty()){
+        delete vtable_record.first()->data;
+        vtable_record.erase(vtable_record.first());
+    }
+    lock->write_unlock();
+    delete lock;
 }
 
-StackItemMetadata::ID TypeInfoServer::add_metadata(StackItemMetadata *p_metadata, const StackItemMetadata::ID &p_id) {
+StackItemMetadata::ID NexusTypeInfoServer::add_metadata(StackItemMetadata *p_metadata, const StackItemMetadata::ID &p_id) {
     p_metadata->type_id = p_id;
-    metadata_collection.add_last(p_metadata);
-    by_id[p_metadata->type_id] = p_metadata;
+    metadata_record.add_last(p_metadata);
+    metadata_map[p_metadata->type_id] = p_metadata;
+    return p_id;
+}
+
+NexusBaseVtable::ID NexusTypeInfoServer::add_vtable(NexusBaseVtable *p_vtable, const NexusBaseVtable::ID &p_id) {
+    vtable_record.add_last(p_vtable);
+    vtable_map[p_id] = p_vtable;
     return p_id;
 }
 
@@ -152,16 +172,21 @@ void NexusStack::Frame::register_object(const StackItemMetadata *p_metadata) {
     });
 }
 
+void NexusStack::Frame::push(const NexusStack::ObjectInfo &p_info) {
+    if (!p_info.is_valid()) throw NexusStackException("p_info is invalid");
+    push(p_info.type, p_info.data);
+}
+
 void NexusStack::Frame::push_empty(const StackItemMetadata *p_metadata) {
     if (!p_metadata) throw NexusStackException("p_metadata is null");
-    p_metadata->constructor(p_metadata, memory_offset);
+    p_metadata->vtable->constructor(p_metadata, memory_offset);
     register_object(p_metadata);
 }
 
 void NexusStack::Frame::push(const StackItemMetadata* p_metadata, const void* p_copy_from) {
     if (!p_metadata) throw NexusStackException("p_metadata is null");
     if (parent->allocated + p_metadata->data_size > parent->max_stack_size) throw NexusStackException("Stack overflow");
-    p_metadata->copy_constructor(p_metadata, memory_offset, p_copy_from);
+    p_metadata->vtable->copy_constructor(p_metadata, memory_offset, p_copy_from);
     register_object(p_metadata);
 }
 
@@ -205,50 +230,58 @@ void NexusStack::Frame::push(const Ref<ManagedObject> &p_ref_counted) {
     push_primitive(NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT, p_ref_counted);
 }
 
-void NexusStack::Frame::set(const int64_t &p_idx, const StackItemMetadata *p_metadata, const void *p_copy_from) {
+void NexusStack::Frame::set(const int64_t &p_idx, const NexusStack::ObjectInfo &p_info) const {
+    auto object = get_at(p_idx);
+    if (!object.is_valid()) throw NexusStackException("Invalid stack frame index");
+    set_object(object, p_info.type, p_info.data);
+}
+
+void NexusStack::Frame::set(const int64_t &p_idx, const StackItemMetadata *p_metadata, const void *p_copy_from) const {
     auto object = get_at(p_idx);
     if (!object.is_valid()) throw NexusStackException("Invalid stack frame index");
     set_object(object, p_metadata, p_copy_from);
 }
 
-void NexusStack::Frame::set(const int64_t &p_idx, const uint32_t &p_u32) {
-    set_primitive(p_idx, p_u32);
+void NexusStack::Frame::set(const int64_t &p_idx, const uint32_t &p_u32) const {
+    set_primitive(p_idx, NexusSerializedBytecode::UNSIGNED_32_BIT_INTEGER, p_u32);
 }
 
-void NexusStack::Frame::set(const int64_t &p_idx, const int32_t &p_i32) {
-    set_primitive(p_idx, p_i32);
+void NexusStack::Frame::set(const int64_t &p_idx, const int32_t &p_i32) const {
+    set_primitive(p_idx, NexusSerializedBytecode::SIGNED_32_BIT_INTEGER, p_i32);
 }
 
-void NexusStack::Frame::set(const int64_t &p_idx, const uint64_t &p_u64) {
-    set_primitive(p_idx, p_u64);
+void NexusStack::Frame::set(const int64_t &p_idx, const uint64_t &p_u64) const {
+    set_primitive(p_idx, NexusSerializedBytecode::UNSIGNED_64_BIT_INTEGER, p_u64);
 }
 
-void NexusStack::Frame::set(const int64_t &p_idx, const int64_t &p_i64) {
-    set_primitive(p_idx, p_i64);
+void NexusStack::Frame::set(const int64_t &p_idx, const int64_t &p_i64) const {
+    set_primitive(p_idx, NexusSerializedBytecode::SIGNED_64_BIT_INTEGER, p_i64);
 }
 
-void NexusStack::Frame::set(const int64_t &p_idx, const float &p_f32) {
-    set_primitive(p_idx, p_f32);
+void NexusStack::Frame::set(const int64_t &p_idx, const float &p_f32) const {
+    set_primitive(p_idx, NexusSerializedBytecode::SINGLE_PRECISION_FLOATING_POINT, p_f32);
 }
 
-void NexusStack::Frame::set(const int64_t &p_idx, const double &p_f64) {
-    set_primitive(p_idx, p_f64);
+void NexusStack::Frame::set(const int64_t &p_idx, const double &p_f64) const {
+    set_primitive(p_idx, NexusSerializedBytecode::DOUBLE_PRECISION_FLOATING_POINT, p_f64);
 }
 
-void NexusStack::Frame::set(const int64_t &p_idx, const wchar_t *p_str) {
-    set_primitive(p_idx, InternedString(p_str));
+void NexusStack::Frame::set(const int64_t &p_idx, const wchar_t *p_str) const {
+    throw NexusStackException("Can not set an InternedString's value");
+//    set_primitive(p_idx, NexusSerializedBytecode::STRING_LITERAL, InternedString(p_str));
 }
 
-void NexusStack::Frame::set(const int64_t &p_idx, const InternedString &p_str) {
-    set_primitive(p_idx, p_str);
+void NexusStack::Frame::set(const int64_t &p_idx, const InternedString &p_str) const {
+    throw NexusStackException("Can not set an InternedString's value");
+//    set_primitive(p_idx, NexusSerializedBytecode::UNSIGNED_32_BIT_INTEGER, p_str);
 }
 
-void NexusStack::Frame::set(const int64_t &p_idx, const VString &p_string) {
-    set_primitive(p_idx, p_string);
+void NexusStack::Frame::set(const int64_t &p_idx, const VString &p_string) const {
+    set_primitive(p_idx, NexusSerializedBytecode::STRING_LITERAL, p_string);
 }
 
-void NexusStack::Frame::set(const int64_t &p_idx, const Ref<ManagedObject> &p_ref_counted) {
-    set_primitive(p_idx, p_ref_counted);
+void NexusStack::Frame::set(const int64_t &p_idx, const Ref<ManagedObject> &p_ref_counted) const {
+    set_primitive(p_idx, NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT, p_ref_counted);
 }
 
 void NexusStack::Frame::pop() {
@@ -259,13 +292,14 @@ void NexusStack::Frame::pop() {
     parent->current_object_count--;
     current_object_count--;
     parent->allocated -= metadata->data_size;
-    metadata->destructor(metadata, memory_offset);
+    metadata->vtable->destructor(metadata, memory_offset);
 
+    // If current frame is not the latest frame, this will lead to undefined behavior
     parent->object_info.pop_back();
 }
 
 void NexusStack::Frame::push_object(const StackItemMetadata *p_metadata, const void* p_data) {
-    p_metadata->copy_constructor(p_metadata, memory_offset, p_data);
+    p_metadata->vtable->copy_constructor(p_metadata, memory_offset, p_data);
     register_object(p_metadata);
 }
 
@@ -287,8 +321,8 @@ NexusStack::~NexusStack() {
     free(stack_begin);
 }
 
-NexusStack::NexusStack(const TypeInfoServer *p_type_info_server, const size_t &p_stack_size, const size_t& p_initial_frame_capacity)
-: stack_begin(malloc(p_stack_size)), max_stack_size(p_stack_size), initial_frame_capacity(p_initial_frame_capacity),
+NexusStack::NexusStack(const NexusTypeInfoServer *p_type_info_server, const size_t &p_stack_size, const size_t& p_initial_frame_capacity)
+: stack_begin(malloc(p_stack_size)), max_stack_size(p_stack_size),
 allocated(0), current_object_count(0), stack_frames(p_initial_frame_capacity),
 type_info_server(p_type_info_server), object_info(p_initial_frame_capacity) {}
 

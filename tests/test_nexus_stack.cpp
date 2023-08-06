@@ -13,15 +13,17 @@ struct CustomStackStruct {
 };
 
 class NexusStackTestFixture: public ::testing::Test{
-    TypeInfoServer* type_info_server;
+    NexusTypeInfoServer* type_info_server;
     NexusStack* stack;
     StackItemMetadata::ID custom_stack_struct_id{};
+    const StackItemMetadata* struct_metadata;
 public:
     void SetUp() override {
         // This would not work if there's any padding
         static_assert(sizeof(CustomStackStruct) == sizeof(CustomStackStruct::i64) + sizeof(CustomStackStruct::f64) + sizeof(CustomStackStruct::string));
         InternedString::configure();
-        type_info_server = new TypeInfoServer(false);
+        type_info_server = new NexusTypeInfoServer(false);
+        auto struct_vtable = type_info_server->get_primitive_vtable(NexusSerializedBytecode::STACK_STRUCT);
         // 1 MiB
         stack = new NexusStack(type_info_server, 1024 * 1024, 16);
         LinkedList<const StackItemMetadata*> custom_stack_struct_metadata = {
@@ -29,7 +31,8 @@ public:
             type_info_server->get_primitive_metadata(NexusBytecodeMetadata::DOUBLE_PRECISION_FLOATING_POINT),
             type_info_server->get_primitive_metadata(NexusBytecodeMetadata::STRING)
         };
-        custom_stack_struct_id = type_info_server->add_struct_type(std::move(custom_stack_struct_metadata));
+        custom_stack_struct_id = type_info_server->add_struct_type(struct_vtable, std::move(custom_stack_struct_metadata));
+        struct_metadata = type_info_server->get_metadata_by_id(custom_stack_struct_id);
     }
     void TearDown() override {
         delete stack;
@@ -43,7 +46,6 @@ public:
         stack->pop_stack_frame();
     }
     void add_objects_1(){
-        const auto* struct_metadata = type_info_server->get_metadata_by_id(custom_stack_struct_id);
         auto& frame = stack->get_last_frame();
         frame.push(12);
         frame.push(32.0f);
@@ -54,7 +56,6 @@ public:
         frame.push(struct_metadata, &struct_type);
     }
     void add_objects_2(){
-        const auto* struct_metadata = type_info_server->get_metadata_by_id(custom_stack_struct_id);
         auto& frame = stack->get_last_frame();
         frame.push(22);
         frame.push(42.0f);
@@ -82,11 +83,27 @@ public:
         if (CAST(f32, float) != 32.0f) return false;
         if (CAST(str, InternedString) != L"Hello World!") return false;
 
-        auto& as_custom_stack_struct = *(CustomStackStruct*)obj.data;
+        {
+            auto &as_custom_stack_struct = *(CustomStackStruct *) obj.data;
 
-        if (as_custom_stack_struct.i64 != 33) return false;
-        if (as_custom_stack_struct.f64 != 4.5) return false;
-        if (as_custom_stack_struct.string != "This is a string") return false;
+            if (as_custom_stack_struct.i64 != 33) return false;
+            if (as_custom_stack_struct.f64 != 4.5) return false;
+            if (as_custom_stack_struct.string != "This is a string") return false;
+        }
+        auto struct_type = CustomStackStruct{
+                23, 3.5, "This is a vector string"
+        };
+        frame.set(-1, struct_metadata, &struct_type);
+        {
+            auto &as_custom_stack_struct = *(CustomStackStruct *) obj.data;
+
+            if (as_custom_stack_struct.i64 != 23) return false;
+            if (as_custom_stack_struct.f64 != 3.5) return false;
+            if (as_custom_stack_struct.string != "This is a vector string") return false;
+        }
+
+        frame.set(-4, 9);
+        if (CAST(i32, int32_t) != 9) return false;
 
         return true;
 #undef CAST
@@ -109,11 +126,29 @@ public:
         if (CAST(f32, float) != 42.0f) return false;
         if (CAST(str, InternedString) != L"Goodbye world!") return false;
 
-        auto& as_custom_stack_struct = *(CustomStackStruct*)obj.data;
+        {
+            auto &as_custom_stack_struct = *(CustomStackStruct *) obj.data;
 
-        if (as_custom_stack_struct.i64 != 23) return false;
-        if (as_custom_stack_struct.f64 != 3.5) return false;
-        if (as_custom_stack_struct.string != "This is a vector string") return false;
+            if (as_custom_stack_struct.i64 != 23) return false;
+            if (as_custom_stack_struct.f64 != 3.5) return false;
+            if (as_custom_stack_struct.string != "This is a vector string") return false;
+        }
+
+        auto struct_type = CustomStackStruct{
+                33, 4.5, "This is a string"
+        };
+        frame.set(-1, struct_metadata, &struct_type);
+
+        {
+            auto &as_custom_stack_struct = *(CustomStackStruct *) obj.data;
+
+            if (as_custom_stack_struct.i64 != 33) return false;
+            if (as_custom_stack_struct.f64 != 4.5) return false;
+            if (as_custom_stack_struct.string != "This is a string") return false;
+        }
+
+        frame.set(-4, 9);
+        if (CAST(i32, int32_t) != 9) return false;
 
         return true;
 #undef CAST

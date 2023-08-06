@@ -25,13 +25,13 @@ private:
     bool is_terminated;
     std::mutex pool_conditional_mutex{};
     std::condition_variable pool_conditional_lock{};
-    Vector<ManagedThread> all_threads;
+    Vector<ManagedThread*> all_threads;
     PriorityQueue<std::function<void()>> task_queue{};
     BinaryMutex threads_lock{};
 
     void allocate_worker_internal(){
-        all_threads.emplace();
-        all_threads.last().start([this]() -> void {
+        all_threads.emplace(new ManagedThread());
+        all_threads.last()->start([this]() -> void {
             while (true){
                 std::function<void()> func;
                 bool dequeued;
@@ -49,6 +49,17 @@ private:
         for (int i = 0; i < all_threads.capacity(); ++i) {
             allocate_worker_internal();
         }
+    }
+protected:
+    _FORCE_INLINE_ void notify_thread() { pool_conditional_lock.notify_one(); }
+
+    template<class T>
+    void submit_task(Priority p_priority, const T& p_promise){
+        std::unique_lock<decltype(pool_conditional_mutex)> lock(pool_conditional_mutex);
+        T promise = p_promise;
+        task_queue.push([promise]() {
+            (*promise)();
+        }, p_priority);
     }
 public:
     _FORCE_INLINE_ void allocate_worker(){
@@ -68,7 +79,8 @@ public:
         pool_conditional_lock.notify_all();
 
         for (auto & m_thread : all_threads) {
-            m_thread.join();
+            m_thread->join();
+            delete m_thread;
         }
         all_threads.clear();
         is_terminated = false;
@@ -82,21 +94,14 @@ public:
         // Encapsulate it into a shared ptr in order to be able to copy construct / assign
         auto task_ptr = std::make_shared<std::packaged_task<decltype(f(args...))()>>(func);
 
-        {
-            std::unique_lock<decltype(pool_conditional_mutex)> lock(pool_conditional_mutex);
-            task_queue.push([task_ptr]() {
-                (*task_ptr)();
-            }, p_priority);
-        }
-
-        // Wake up one thread if its waiting
-        pool_conditional_lock.notify_one();
+        submit_task(p_priority, task_ptr);
+        notify_thread();
 
         // Return future from promise
         return task_ptr->get_future();
     }
     explicit ThreadPool(const uint8_t& n_threads = 3)
-            : all_threads(Vector<ManagedThread>(n_threads)), is_terminated(false) {
+            : all_threads(Vector<ManagedThread*>(n_threads)), is_terminated(false) {
         init();
     }
 

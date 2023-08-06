@@ -5,7 +5,7 @@
 #ifndef NEXUS_MEMF_H
 #define NEXUS_MEMF_H
 
-#include "memory"
+#include <memory.h>
 
 template <class T>
 void memdelete(T *p_class) {

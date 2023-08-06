@@ -849,3 +849,32 @@ VString VString::num_scientific(double p_num) {
     return String::num(p_num);
 #endif
 }
+
+bool VString::is_absolute_path() const {
+    if (length() > 1) {
+        return (operator[](0) == '/' || operator[](0) == '\\' || find(":/") != -1 || find(":\\") != -1);
+    } else if ((length()) == 1) {
+        return (operator[](0) == '/' || operator[](0) == '\\');
+    } else {
+        return false;
+    }
+}
+
+VString VString::plus_file(const VString& p_file) const {
+    if (empty()) {
+        return p_file;
+    }
+    if (operator[](length() - 1) == '/' || (p_file.capacity() > 0 && p_file.operator[](0) == '/')) {
+        return *this + p_file;
+    }
+    return *this + "/" + p_file;
+}
+
+VString VString::get_file() const {
+    int sep = MAX(rfind("/"), rfind("\\"));
+    if (sep == -1) {
+        return *this;
+    }
+
+    return substr(sep + 1, length());
+}

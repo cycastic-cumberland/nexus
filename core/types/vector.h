@@ -88,13 +88,16 @@ public:
     _FORCE_INLINE_ T& last() { return operator[](size() - 1); }
     _FORCE_INLINE_ void push_back(const T& p_value){
         if (size() == capacity()) data.resize(capacity() == 0 ? 1 : capacity() * 2);
-        // Call copy constructor
         new (&data.ptrw()[usage++]) T(p_value);
     }
     template<class... Args>
     _FORCE_INLINE_ void emplace(Args&& ...args){
         if (size() == capacity()) data.resize(capacity() == 0 ? 1 : capacity() * 2);
         new (&data.ptrw()[usage++]) T(args...);
+    }
+    _FORCE_INLINE_ void move_back(T&& p_value){
+        if (size() == capacity()) data.resize(capacity() == 0 ? 1 : capacity() * 2);
+        new (&data.ptrw()[usage++]) T(p_value);
     }
     _FORCE_INLINE_ void append(const Vector<T>& p_other){
         for (int i = 0; i < p_other.size(); i++){

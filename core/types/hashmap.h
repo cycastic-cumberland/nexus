@@ -310,6 +310,9 @@ public:
         growth_factor = p_other.growth_factor;
         copy(p_other);
     }
+    ~HashMap() {
+        delete current_map;
+    }
 };
 
 #endif //NEXUS_HASHMAP_H

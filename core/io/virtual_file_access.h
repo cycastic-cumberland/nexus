@@ -12,9 +12,12 @@ private:
     mutable size_t position = 0;
     CowArray<uint8_t> data;
 public:
-    void close() override {}
+    void close() override { data = CowArray<uint8_t>(); }
     bool is_open() const override { return true; }
     void open(const VString& p_file_path, AccessType p_access_type) override {}
+
+    const uint8_t* ptr() const { return data.ptr(); }
+    uint8_t* ptrw() { return data.ptrw(); }
 
     size_t get_pos() const override { return position; }
     size_t get_file_size() const override { return data.capacity(); }

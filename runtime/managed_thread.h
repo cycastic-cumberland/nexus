@@ -17,8 +17,8 @@
 class ManagedThread {
 public:
     typedef uint64_t ID;
-private:
     static uint64_t thread_id_hash(const std::thread::id& p_native_id);
+private:
 
     static ID main_thread_id;
 

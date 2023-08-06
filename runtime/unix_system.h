@@ -1,13 +1,12 @@
 //
-// Created by cycastic on 7/22/2023.
+// Created by cycastic on 8/6/2023.
 //
-
-#if defined(_WIN32) || defined(_WIN64)
-#ifndef NEXUS_WINDOWS_SYSTEM_H
-#define NEXUS_WINDOWS_SYSTEM_H
+#ifdef __linux__
+#ifndef NEXUS_UNIX_SYSTEM_H
+#define NEXUS_UNIX_SYSTEM_H
 
 #include "system.h"
-class WindowsSystem : public System {
+class UnixSystem : public System {
 public:
     void load_dynamic_library(const VString& p_lib_path, void*& p_library_handle, const bool& p_also_set_library_path = false) override;
     bool close_dynamic_library(void *p_library_handle) override;
@@ -15,8 +14,9 @@ public:
     void print_line(const VString& p_message) override;
     void print_error(const VString& p_message) override { print_line(p_message); }
     void print_warning(const VString& p_message) override { print_line(p_message); }
-    WindowsSystem();
-    ~WindowsSystem() override;
+    UnixSystem();
+    ~UnixSystem() override;
 };
-#endif //NEXUS_WINDOWS_SYSTEM_H
+
+#endif //NEXUS_UNIX_SYSTEM_H
 #endif
