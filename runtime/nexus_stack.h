@@ -10,6 +10,7 @@
 #include "../core/types/stack.h"
 #include "../core/types/hashmap.h"
 #include "../core/types/linked_list.h"
+#include "../core/types/box.h"
 
 class InternedString;
 struct StackItemMetadata;
@@ -296,7 +297,7 @@ private:
     void* stack_begin;
     size_t allocated;
     size_t current_object_count;
-    VectorStack<Frame> stack_frames;
+    VectorStack<Box<Frame, UnsafeObject>> stack_frames;
     Vector<ObjectInfo> object_info;
 public:
     NexusStack(const NexusTypeInfoServer* p_type_info_server, const size_t& p_stack_size, const size_t& p_initial_frame_capacity);
@@ -307,13 +308,13 @@ public:
     // This is potentially unsafe, but as long as you are careful, there should be no problem
     // Plus, allocating the stack frame itself on the Vector's heap is more efficient.
     // Just make sure not to push any frame onto the stack while holding a reference
-    Frame& push_stack_frame();
+    Box<NexusStack::Frame, UnsafeObject>& push_stack_frame();
     bool pop_stack_frame();
-    _NO_DISCARD_ Frame& get_last_frame();
-    _NO_DISCARD_ const Frame& get_last_frame() const;
+    _NO_DISCARD_ Box<Frame, UnsafeObject>& get_last_frame();
+    _NO_DISCARD_ const Box<Frame, UnsafeObject>& get_last_frame() const;
     // DO NOT const_cast this Frame&, pushing onto a frame that is not at the top of the stack
     // lead to undefined behavior. There will be no check so do it at your discretion
-    _NO_DISCARD_ const Frame& get_frame_at(const int64_t& p_idx) const;
+    _NO_DISCARD_ const Box<Frame, UnsafeObject>& get_frame_at(const int64_t& p_idx) const;
 
     _NO_DISCARD_ _FORCE_INLINE_ size_t frame_count() const { return stack_frames.size(); }
     _NO_DISCARD_ _FORCE_INLINE_ size_t object_count() const { return object_info.size(); }

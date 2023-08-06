@@ -18,7 +18,7 @@ class Ref {
 public:
     void unref() {
         if (reference && reference->unref()) {
-            memdelete(reference);
+            delete reference;
             reference = nullptr;
         }
     }

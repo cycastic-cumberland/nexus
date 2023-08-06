@@ -23,7 +23,7 @@ private:
     void unref(){
         if (cow_data && cow_data->refcount.unref()) {
             free(cow_data->data);
-            memdelete(cow_data);
+            delete cow_data;
         }
     }
     void ref(CowData* p_data){
@@ -40,6 +40,9 @@ private:
         auto new_data = new CowData();
         new_data->data = (T*) malloc(sizeof(T) * cow_data->capacity);
         memcpy(new_data->data, cow_data->data, cow_data->capacity * sizeof(T));
+        for (size_t i = 0; i < cow_data->capacity; i++){
+            new (&new_data->data[i]) T(cow_data->data[i]);
+        }
         new_data->capacity = cow_data->capacity;
         unref();
         cow_data = new_data;

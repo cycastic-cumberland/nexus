@@ -326,8 +326,8 @@ NexusStack::NexusStack(const NexusTypeInfoServer *p_type_info_server, const size
 allocated(0), current_object_count(0), stack_frames(p_initial_frame_capacity),
 type_info_server(p_type_info_server), object_info(p_initial_frame_capacity) {}
 
-NexusStack::Frame &NexusStack::push_stack_frame() {
-    stack_frames.emplace(this);
+Box<NexusStack::Frame, UnsafeObject> &NexusStack::push_stack_frame() {
+    stack_frames.emplace(Box<Frame, UnsafeObject>::make_box(this));
     return get_last_frame();
 }
 
@@ -337,14 +337,14 @@ bool NexusStack::pop_stack_frame() {
     return true;
 }
 
-NexusStack::Frame &NexusStack::get_last_frame() {
+Box<NexusStack::Frame, UnsafeObject> &NexusStack::get_last_frame() {
     return stack_frames.modify_last();
 }
 
-const NexusStack::Frame &NexusStack::get_last_frame() const {
+const Box<NexusStack::Frame, UnsafeObject> &NexusStack::get_last_frame() const {
     return stack_frames.peek_last();
 }
 
-const NexusStack::Frame &NexusStack::get_frame_at(const int64_t &p_idx) const {
+const Box<NexusStack::Frame, UnsafeObject> &NexusStack::get_frame_at(const int64_t &p_idx) const {
     return stack_frames.peek_at(p_idx);
 }

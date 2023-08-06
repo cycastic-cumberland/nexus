@@ -47,33 +47,33 @@ public:
     }
     void add_objects_1(){
         auto& frame = stack->get_last_frame();
-        frame.push(12);
-        frame.push(32.0f);
-        frame.push(L"Hello World!");
+        frame->push(12);
+        frame->push(32.0f);
+        frame->push(L"Hello World!");
         auto struct_type = CustomStackStruct{
             33, 4.5, "This is a string"
         };
-        frame.push(struct_metadata, &struct_type);
+        frame->push(struct_metadata, &struct_type);
     }
     void add_objects_2(){
         auto& frame = stack->get_last_frame();
-        frame.push(22);
-        frame.push(42.0f);
-        frame.push(L"Goodbye world!");
+        frame->push(22);
+        frame->push(42.0f);
+        frame->push(L"Goodbye world!");
         auto struct_type = CustomStackStruct{
                 23, 3.5, "This is a vector string"
         };
-        frame.push(struct_metadata, &struct_type);
+        frame->push(struct_metadata, &struct_type);
     }
     bool check_objects_1(int64_t p_idx){
 #define CAST(value, type) *(type*)(value.data)
         const auto& frame = stack->get_frame_at(p_idx);
-        if (frame.object_count() != 4) return false;
+        if (frame->object_count() != 4) return false;
 
-        auto i32 = frame.get_at(-4);
-        auto f32 = frame.get_at(-3);
-        auto str = frame.get_at(-2);
-        auto obj = frame.get_at(-1);
+        auto i32 = frame->get_at(-4);
+        auto f32 = frame->get_at(-3);
+        auto str = frame->get_at(-2);
+        auto obj = frame->get_at(-1);
 
         if (i32.type->type != NexusSerializedBytecode::SIGNED_32_BIT_INTEGER) return false;
         if (f32.type->type != NexusSerializedBytecode::SINGLE_PRECISION_FLOATING_POINT) return false;
@@ -93,7 +93,7 @@ public:
         auto struct_type = CustomStackStruct{
                 23, 3.5, "This is a vector string"
         };
-        frame.set(-1, struct_metadata, &struct_type);
+        frame->set(-1, struct_metadata, &struct_type);
         {
             auto &as_custom_stack_struct = *(CustomStackStruct *) obj.data;
 
@@ -102,7 +102,7 @@ public:
             if (as_custom_stack_struct.string != "This is a vector string") return false;
         }
 
-        frame.set(-4, 9);
+        frame->set(-4, 9);
         if (CAST(i32, int32_t) != 9) return false;
 
         return true;
@@ -111,12 +111,12 @@ public:
     bool check_objects_2(int64_t p_idx){
 #define CAST(value, type) *(type*)(value.data)
         const auto& frame = stack->get_frame_at(p_idx);
-        if (frame.object_count() != 4) return false;
+        if (frame->object_count() != 4) return false;
 
-        auto i32 = frame.get_at(-4);
-        auto f32 = frame.get_at(-3);
-        auto str = frame.get_at(-2);
-        auto obj = frame.get_at(-1);
+        auto i32 = frame->get_at(-4);
+        auto f32 = frame->get_at(-3);
+        auto str = frame->get_at(-2);
+        auto obj = frame->get_at(-1);
 
         if (i32.type->type != NexusSerializedBytecode::SIGNED_32_BIT_INTEGER) return false;
         if (f32.type->type != NexusSerializedBytecode::SINGLE_PRECISION_FLOATING_POINT) return false;
@@ -137,7 +137,7 @@ public:
         auto struct_type = CustomStackStruct{
                 33, 4.5, "This is a string"
         };
-        frame.set(-1, struct_metadata, &struct_type);
+        frame->set(-1, struct_metadata, &struct_type);
 
         {
             auto &as_custom_stack_struct = *(CustomStackStruct *) obj.data;
@@ -147,7 +147,7 @@ public:
             if (as_custom_stack_struct.string != "This is a string") return false;
         }
 
-        frame.set(-4, 9);
+        frame->set(-4, 9);
         if (CAST(i32, int32_t) != 9) return false;
 
         return true;

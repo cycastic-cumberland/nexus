@@ -6,6 +6,7 @@
 #include <cstring>
 #include "../core/io/file_access_server.h"
 #include "../runtime/utils.h"
+#include "../core/types/box.h"
 
 static void BM_BatchCopy(benchmark::State& state) {
     const auto allocation_size = state.range(0);
