@@ -8,6 +8,7 @@
 #include "../core/types/vstring.h"
 #include "../core/types/vector.h"
 #include "../core/types/hashmap.h"
+#include "../core/types/interned_string.h"
 
 class NexusLexer {
 public:
@@ -62,10 +63,10 @@ public:
     };
     struct Token {
         TokenType type;
-        VString lexeme;
+        InternedString lexeme;
         uint32_t line;
         uint32_t column;
-        Token(const TokenType& token_type, const VString& lex, const uint32_t& row, const uint32_t& col){
+        Token(const TokenType& token_type, const InternedString& lex, const uint32_t& row, const uint32_t& col){
             type = token_type;
             lexeme = lex;
             line = row;
@@ -97,33 +98,39 @@ public:
     };
 private:
     static const char token_characters[TK_MAX];
-    static HashMap<wchar_t, TokenType, 512>* tokens_map;
-    static HashMap<VString, TokenType, 64>* operators_map;
+    static HashMap<wchar_t, TokenType>* tokens_map;
+    static HashMap<InternedString, TokenType>* operators_map;
 
     Vector<Token> tokens{};
 
-    static _FORCE_INLINE_ HashMap<wchar_t, NexusLexer::TokenType, 512>* allocate_tokens_map(){
-        auto map = new HashMap<wchar_t, NexusLexer::TokenType, 512>();
+    static _FORCE_INLINE_ HashMap<wchar_t, NexusLexer::TokenType>* allocate_tokens_map(){
+        auto map = new HashMap<wchar_t, NexusLexer::TokenType>(0.75, 512, false);
         for (int i = TokenType::TK_EMPTY; i < TokenType::TK_MAX; i++){
             map->operator[](token_characters[i]) = (TokenType)i;
         }
         return map;
     }
-    static HashMap<VString, NexusLexer::TokenType, 64>* allocate_operators_map();
+    static HashMap<InternedString, NexusLexer::TokenType>* allocate_operators_map();
 public:
-    static _FORCE_INLINE_ const HashMap<wchar_t, TokenType, 512>& get_tokens_map() { return *tokens_map; }
-    static _FORCE_INLINE_ const HashMap<VString, NexusLexer::TokenType, 64>& get_operators_map() { return *operators_map; }
+    static _FORCE_INLINE_ const HashMap<wchar_t, TokenType>& get_tokens_map() { return *tokens_map; }
+    static _FORCE_INLINE_ const HashMap<InternedString, NexusLexer::TokenType>& get_operators_map() { return *operators_map; }
 
-    _FORCE_INLINE_ void clear_tokens() { tokens.clear(); }
-    _NO_DISCARD_ _FORCE_INLINE_ const Vector<Token>& extract_tokens() const { return tokens; }
-    LexicalError tokenize_text(const VString& text);
-
-    NexusLexer(){
+    static _FORCE_INLINE_ void init_cache() {
         if (tokens_map == nullptr)
             tokens_map = allocate_tokens_map();
         if (operators_map == nullptr)
             operators_map = allocate_operators_map();
     }
+    static _FORCE_INLINE_ void free_cache() {
+        delete tokens_map;
+        delete operators_map;
+    }
+
+    _FORCE_INLINE_ void clear_tokens() { tokens.clear(); }
+    _NO_DISCARD_ _FORCE_INLINE_ const Vector<Token>& extract_tokens() const { return tokens; }
+    LexicalError tokenize_text(const InternedString& text);
+
+    NexusLexer()= default;
 };
 
 #endif //NEXUS_LEXER_H

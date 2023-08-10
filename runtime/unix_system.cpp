@@ -43,7 +43,7 @@ void UnixSystem::get_dynamic_library_symbol_handle(void *p_library_handle, const
 }
 
 void UnixSystem::print_line(const VString &p_message) {
-    std::wcout << p_message;
+    std::wcout << p_message << L"\n";
 }
 
 UnixSystem::UnixSystem() {

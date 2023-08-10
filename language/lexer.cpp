@@ -51,11 +51,11 @@ const char NexusLexer:: token_characters[TK_MAX] = {
         '}',
 };
 
-HashMap<wchar_t, NexusLexer::TokenType, 512>* NexusLexer::tokens_map = nullptr;
-HashMap<VString, NexusLexer::TokenType, 64>* NexusLexer::operators_map = nullptr;
+HashMap<wchar_t, NexusLexer::TokenType>* NexusLexer::tokens_map = nullptr;
+HashMap<InternedString, NexusLexer::TokenType>* NexusLexer::operators_map = nullptr;
 
 
-NexusLexer::LexicalError NexusLexer::tokenize_text(const VString &text) {
+NexusLexer::LexicalError NexusLexer::tokenize_text(const InternedString &text) {
 #define FLUSH_LEXEME() {                    \
     LexicalError err;                       \
     flush_lexeme(&err);                     \
@@ -67,12 +67,12 @@ NexusLexer::LexicalError NexusLexer::tokenize_text(const VString &text) {
     uint32_t last_line = 1;
     uint32_t last_column = 1;
     bool escape_enabled = false;
-    VString current_lexeme{};
+    InternedString current_lexeme{};
     Stack<TokenType> punctuations{};
     const auto record_coordinate = [&]() -> void {
         last_line = current_line;  last_column = current_column;
     };
-    const auto flush_lexeme_detailed = [&](const VString& lex,
+    const auto flush_lexeme_detailed = [&](const InternedString& lex,
             const uint32_t& x, const uint32_t& y, TokenType type = TK_IDENTIFIER) -> void {
         Token tok = (type == TK_IDENTIFIER && lex[0] >= L'0' && lex[0] <= L'9') ?
                     Token(TK_NUMBER, lex, x, y) : Token(type, lex, x, y);
@@ -87,7 +87,7 @@ NexusLexer::LexicalError NexusLexer::tokenize_text(const VString &text) {
             record_coordinate();
             return;
         }
-        VString buffer{};
+        InternedString buffer{};
         wchar_t last_char = 0;
         uint32_t current_column_cursor = last_column;
 #define ASSIGNMENT_FLUSH_HELPER(type){                                          \
@@ -188,7 +188,7 @@ NexusLexer::LexicalError NexusLexer::tokenize_text(const VString &text) {
             case TK_DE_DOT: if (punctuations.empty() || punctuations.peek_last() != TK_PU_DOUBLE_QUOTE || mapped_type == TK_EOL) {
                 FLUSH_LEXEME();
                 if (!(mapped_type >= TK_EOF && mapped_type <= TK_EOL))
-                    tokens.push_back(Token(mapped_type, VString(curr_char),
+                    tokens.push_back(Token(mapped_type, InternedString(curr_char),
                                        last_line, last_column));
                 record_coordinate();
                 break;
@@ -217,7 +217,7 @@ NexusLexer::LexicalError NexusLexer::tokenize_text(const VString &text) {
                 punctuations.push(mapped_type);
                 skip_punctuation_push:
                 FLUSH_LEXEME();
-                tokens.push_back(Token(mapped_type, VString(curr_char),
+                tokens.push_back(Token(mapped_type, InternedString(curr_char),
                                        last_line, last_column));
                 record_coordinate();
                 break;
@@ -231,7 +231,7 @@ NexusLexer::LexicalError NexusLexer::tokenize_text(const VString &text) {
                     return {LE_MISMATCH_CLOSING_PATTERN, current_line, current_column};
                 // Does not return pattern
                 FLUSH_LEXEME();
-                tokens.push_back(Token(mapped_type, VString(curr_char),
+                tokens.push_back(Token(mapped_type, InternedString(curr_char),
                                        last_line, last_column));
                 record_coordinate();
                 break;
@@ -275,8 +275,8 @@ NexusLexer::LexicalError NexusLexer::tokenize_text(const VString &text) {
     return {LE_NONE, 0, 0};
 }
 
-HashMap<VString, NexusLexer::TokenType, 64> *NexusLexer::allocate_operators_map() {
-    auto map = new HashMap<VString, NexusLexer::TokenType, 64>();
+HashMap<InternedString, NexusLexer::TokenType> *NexusLexer::allocate_operators_map() {
+    auto map = new HashMap<InternedString, NexusLexer::TokenType>(0.75, 64, false);
     map->operator[]("+") = NexusLexer::TK_OP_ADD;
     map->operator[]("+=") = NexusLexer::TK_OP_SELF_INCREMENT;
     map->operator[]("-") = NexusLexer::TK_OP_SUBTRACT;

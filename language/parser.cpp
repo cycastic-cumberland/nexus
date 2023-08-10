@@ -4,76 +4,64 @@
 
 #include "parser.h"
 
-HashMap<VString, NexusASTExpression::Operator, 128>* NexusASTExpression::operators_map = nullptr;
+HashMap<InternedString, NexusASTNode::OperatorType>* NexusParser::operators_map = nullptr;
+HashMap<InternedString, NexusASTNode::KeywordType>*  NexusParser::keywords_map  = nullptr;
+NFA<NexusParser*>* NexusParser::state_machine = nullptr;
 
-void NexusParser::initialize_parser_symbols_map() {
-    if (!NexusASTExpression::operators_map) {
-        NexusASTExpression::operators_map = new HashMap<VString, NexusASTExpression::Operator, 128>();
-        auto& map = *NexusASTExpression::operators_map;
-        map["+"]    = NexusASTExpression::OP_ADD;
-        map["-"]    = NexusASTExpression::OP_SUBTRACT;
-        map["*"]    = NexusASTExpression::OP_MULTIPLY;
-        map["/"]    = NexusASTExpression::OP_DIVIDE;
-        map["%"]    = NexusASTExpression::OP_MODULUS;
+void NexusParser::init_cache() {
+    if (!operators_map){
+        operators_map = new HashMap<InternedString, NexusASTNode::OperatorType>(0.75, 128, false);
+        auto& op_map = *operators_map;
+        op_map["+"]    = NexusASTNode::OP_ADD;
+        op_map["-"]    = NexusASTNode::OP_SUBTRACT;
+        op_map["*"]    = NexusASTNode::OP_MULTIPLY;
+        op_map["/"]    = NexusASTNode::OP_DIVIDE;
+        op_map["%"]    = NexusASTNode::OP_MODULUS;
 
-        map["="]    = NexusASTExpression::OP_ASSIGN;
-        map["+="]   = NexusASTExpression::OP_ADD_ASSIGN;
-        map["-="]   = NexusASTExpression::OP_SUBTRACT_ASSIGN;
-        map["*="]   = NexusASTExpression::OP_MULTIPLY_ASSIGN;
-        map["/="]   = NexusASTExpression::OP_DIVIDE_ASSIGN;
-        map["%="]   = NexusASTExpression::OP_MODULUS_ASSIGN;
+        op_map["="]    = NexusASTNode::OP_ASSIGN;
+        op_map["+="]   = NexusASTNode::OP_ADD_ASSIGN;
+        op_map["-="]   = NexusASTNode::OP_SUBTRACT_ASSIGN;
+        op_map["*="]   = NexusASTNode::OP_MULTIPLY_ASSIGN;
+        op_map["/="]   = NexusASTNode::OP_DIVIDE_ASSIGN;
+        op_map["%="]   = NexusASTNode::OP_MODULUS_ASSIGN;
 
-        map["=="]   = NexusASTExpression::OP_EQUAL;
-        map["!="]   = NexusASTExpression::OP_NOT_EQUAL;
-        map[">"]    = NexusASTExpression::OP_GREATER;
-        map[">="]   = NexusASTExpression::OP_GREATER_OR_EQUAL;
-        map["<"]    = NexusASTExpression::OP_LESSER;
-        map["<="]   = NexusASTExpression::OP_LESSER_OR_EQUAL;
+        op_map["=="]   = NexusASTNode::OP_EQUAL;
+        op_map["!="]   = NexusASTNode::OP_NOT_EQUAL;
+        op_map[">"]    = NexusASTNode::OP_GREATER;
+        op_map[">="]   = NexusASTNode::OP_GREATER_OR_EQUAL;
+        op_map["<"]    = NexusASTNode::OP_LESSER;
+        op_map["<="]   = NexusASTNode::OP_LESSER_OR_EQUAL;
 
-        map["&&"]   = NexusASTExpression::OP_AND;
-        map["||"]   = NexusASTExpression::OP_OR;
-        map["!"]    = NexusASTExpression::OP_NOT;
+        op_map["&&"]   = NexusASTNode::OP_AND;
+        op_map["||"]   = NexusASTNode::OP_OR;
+        op_map["!"]    = NexusASTNode::OP_NOT;
 
-        map["&"]    = NexusASTExpression::OP_BIT_AND;
-        map["|"]    = NexusASTExpression::OP_BIT_OR;
-        map["^"]    = NexusASTExpression::OP_BIT_XOR;
-        map["~"]    = NexusASTExpression::OP_BIT_NOT;
-        map["<<"]   = NexusASTExpression::OP_LEFT_SHIRT;
-        map[">>"]   = NexusASTExpression::OP_RIGHT_SHIFT;
+        op_map["&"]    = NexusASTNode::OP_BIT_AND;
+        op_map["|"]    = NexusASTNode::OP_BIT_OR;
+        op_map["^"]    = NexusASTNode::OP_BIT_XOR;
+        op_map["~"]    = NexusASTNode::OP_BIT_NOT;
+        op_map["<<"]   = NexusASTNode::OP_LEFT_SHIFT;
+        op_map[">>"]   = NexusASTNode::OP_RIGHT_SHIFT;
 
-        map["--"]   = NexusASTExpression::OP_INCREMENT;
-        map["++"]   = NexusASTExpression::OP_DECREMENT;
+        op_map["--"]   = NexusASTNode::OP_INCREMENT;
+        op_map["++"]   = NexusASTNode::OP_DECREMENT;
 
-        map["."]    = NexusASTExpression::OP_MEMBER_DOT;
+        op_map["."]    = NexusASTNode::OP_MEMBER_DOT;
+    }
+    if (!keywords_map) {
+        keywords_map = new HashMap<InternedString, NexusASTNode::KeywordType>(0.75, 128, false);
+        auto& k_map = *keywords_map;
+        k_map["func"]       = NexusASTNode::KW_FUNC;
+        k_map["void"]       = NexusASTNode::KW_VOID;
+        k_map["return"]     = NexusASTNode::KW_RETURN;
+    }
+    if (!state_machine){
+        state_machine = new NFA<NexusParser*>();
     }
 }
 
-void NexusParser::delete_parser_symbols_map() {
-    delete NexusASTExpression::operators_map;
-}
-
-void NexusParser::parse_tokens(const Vector<NexusLexer::Token> &p_tokens) {
-
-}
-
-template <class TTo, class TFrom>
-static Ref<TTo> nexus_ast_cast_helper(TFrom* p_from){
-    auto ptr = dynamic_cast<TTo*>(p_from);
-    return Ref<TTo>::from_initialized_object(ptr);
-}
-
-Ref<NexusASTInstructionRETURN> NexusASTInstruction::to_return_instruction() {
-    return nexus_ast_cast_helper<NexusASTInstructionRETURN>(this);
-}
-
-Ref<NexusASTInstructionIF> NexusASTInstruction::to_if_instruction() {
-    return nexus_ast_cast_helper<NexusASTInstructionIF>(this);
-}
-
-Ref<NexusASTInstructionELSE> NexusASTInstruction::to_else_instruction() {
-    return nexus_ast_cast_helper<NexusASTInstructionELSE>(this);
-}
-
-Ref<NexusASTInstructionWHILE> NexusASTInstruction::to_while_instruction() {
-    return nexus_ast_cast_helper<NexusASTInstructionWHILE>(this);
+void NexusParser::free_cache() {
+    delete operators_map;
+    delete keywords_map;
+    delete state_machine;
 }

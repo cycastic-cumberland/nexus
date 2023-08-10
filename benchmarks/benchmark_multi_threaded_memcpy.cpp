@@ -11,7 +11,7 @@
 static void BM_BatchCopy(benchmark::State& state) {
     const auto allocation_size = state.range(0);
     const auto thread_count = state.range(1);
-    Box<ThreadPool, UnsafeObject> thread_pool= Box<ThreadPool, UnsafeObject>::make_box(thread_count);
+    Box<ThreadPool, ThreadUnsafeObject> thread_pool= Box<ThreadPool, ThreadUnsafeObject>::make_box(thread_count);
     char* from = new char[state.range(0)];
     char* to = new char[state.range(0)];
     for (size_t i = 0; i < allocation_size; i++){

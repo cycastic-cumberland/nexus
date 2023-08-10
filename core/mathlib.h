@@ -25,6 +25,16 @@ public:
     static constexpr uint64_t min_u64 = 0x0;
     static constexpr  int64_t max_i64 = 0x7FFFFFFFFFFFFFFF;
     static constexpr  int64_t min_i64 = 0x8000000000000000;
+    static constexpr  size_t max_ptr =
+#if defined(i386) || defined(__i386__) || defined(__i386) || defined(_M_IX86)
+            max_u32
+#elif defined(__x86_64__) || defined(_M_X64)
+            max_u64
+#else
+            0
+#endif
+        ;
+    static constexpr  size_t min_ptr = 0x0;
 
     static _ALWAYS_INLINE_ bool is_infinite(const double& p_val) {
         return std::isinf(p_val);

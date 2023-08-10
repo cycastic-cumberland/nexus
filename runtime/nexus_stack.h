@@ -85,13 +85,13 @@ struct StackItemMetadata {
     // this value is opaque, does not affect the add process
     ID type_id;
 
-    NexusSerializedBytecode::DataType type;
+    NexusStandardType type;
     size_t data_size;
     const NexusBaseVtable* vtable;
 
     virtual ~StackItemMetadata() = default;
     StackItemMetadata(const ID& p_id,
-                      const NexusSerializedBytecode::DataType& p_type,
+                      const NexusStandardType& p_type,
                       const size_t& p_total_size,
                       const NexusBaseVtable* p_vtable)
                       : type_id(p_id),
@@ -113,14 +113,14 @@ public:
     static void default_struct_destructor(const StackItemMetadata* p_metadata, void* p_mem_region);
 
     StackStructItemMetadata(const ID& p_id,
-                            const NexusSerializedBytecode::DataType& p_type,
+                            const NexusStandardType& p_type,
                             const size_t& p_total_size,
                             const NexusBaseVtable* p_vtable,
                             const LinkedList<const StackItemMetadata*>& p_struct_items)
                             : StackItemMetadata(p_id, p_type, p_total_size, p_vtable),
                             struct_items(p_struct_items) { build_cache(); }
     StackStructItemMetadata(const ID& p_id,
-                            const NexusSerializedBytecode::DataType& p_type,
+                            const NexusStandardType& p_type,
                             const size_t& p_total_size,
                             const NexusBaseVtable* p_vtable,
                             LinkedList<const StackItemMetadata*>&& p_struct_items)
@@ -153,7 +153,7 @@ public:
     }
     template<class ...Args>
     _FORCE_INLINE_ StackItemMetadata::ID add_struct_type(Args&& ...args){
-        return add_derived_type<StackStructItemMetadata>(0, NexusSerializedBytecode::STACK_STRUCT, 0, args...);
+        return add_derived_type<StackStructItemMetadata>(0, NexusStandardType::STACK_STRUCT, 0, args...);
     }
     template<class T, class ...Args>
     _FORCE_INLINE_ NexusBaseVtable::ID add_custom_vtable(Args&& ...args){
@@ -177,7 +177,7 @@ public:
         metadata_map.try_get(p_id, re);
         return re;
     }
-    _FORCE_INLINE_ const StackItemMetadata* get_primitive_metadata(NexusSerializedBytecode::DataType p_data_type) const {
+    _FORCE_INLINE_ const StackItemMetadata* get_primitive_metadata(NexusStandardType p_data_type) const {
         return get_metadata_by_id((StackItemMetadata::ID)p_data_type);
     }
     _FORCE_INLINE_ const NexusBaseVtable* get_vtable_by_id(const NexusBaseVtable::ID& p_id) const {
@@ -192,7 +192,7 @@ public:
 //        vtable_map.try_get(p_id, re);
 //        return const_cast<NexusBaseVtable*>(re);
 //    }
-    _FORCE_INLINE_ const NexusBaseVtable* get_primitive_vtable(NexusSerializedBytecode::DataType p_data_type) const {
+    _FORCE_INLINE_ const NexusBaseVtable* get_primitive_vtable(NexusStandardType p_data_type) const {
         return get_vtable_by_id((NexusBaseVtable::ID)p_data_type);
     }
 };
@@ -226,11 +226,11 @@ public:
         friend class NexusStack;
 
         template<class T>
-        void push_primitive(const NexusSerializedBytecode::DataType& p_type, const T& p_data);
+        void push_primitive(const NexusStandardType& p_type, const T& p_data);
         void push_object(const StackItemMetadata* p_metadata, const void* p_data);
 
         template<class T>
-        void set_primitive(const int64_t &p_idx, const NexusSerializedBytecode::DataType &p_type, const T &p_data) const;
+        void set_primitive(const int64_t &p_idx, const NexusStandardType &p_type, const T &p_data) const;
 
         static void set_object(const ObjectInfo& p_info, const StackItemMetadata* p_metadata, const void* p_data);
         void register_object(const StackItemMetadata* p_metadata);
@@ -297,7 +297,7 @@ private:
     void* stack_begin;
     size_t allocated;
     size_t current_object_count;
-    VectorStack<Box<Frame, UnsafeObject>> stack_frames;
+    VectorStack<Box<Frame, ThreadUnsafeObject>> stack_frames;
     Vector<ObjectInfo> object_info;
 public:
     NexusStack(const NexusTypeInfoServer* p_type_info_server, const size_t& p_stack_size, const size_t& p_initial_frame_capacity);
@@ -308,13 +308,13 @@ public:
     // This is potentially unsafe, but as long as you are careful, there should be no problem
     // Plus, allocating the stack frame itself on the Vector's heap is more efficient.
     // Just make sure not to push any frame onto the stack while holding a reference
-    Box<NexusStack::Frame, UnsafeObject>& push_stack_frame();
+    Box<NexusStack::Frame, ThreadUnsafeObject>& push_stack_frame();
     bool pop_stack_frame();
-    _NO_DISCARD_ Box<Frame, UnsafeObject>& get_last_frame();
-    _NO_DISCARD_ const Box<Frame, UnsafeObject>& get_last_frame() const;
+    _NO_DISCARD_ Box<Frame, ThreadUnsafeObject>& get_last_frame();
+    _NO_DISCARD_ const Box<Frame, ThreadUnsafeObject>& get_last_frame() const;
     // DO NOT const_cast this Frame&, pushing onto a frame that is not at the top of the stack
     // lead to undefined behavior. There will be no check so do it at your discretion
-    _NO_DISCARD_ const Box<Frame, UnsafeObject>& get_frame_at(const int64_t& p_idx) const;
+    _NO_DISCARD_ const Box<Frame, ThreadUnsafeObject>& get_frame_at(const int64_t& p_idx) const;
 
     _NO_DISCARD_ _FORCE_INLINE_ size_t frame_count() const { return stack_frames.size(); }
     _NO_DISCARD_ _FORCE_INLINE_ size_t object_count() const { return object_info.size(); }
@@ -322,7 +322,7 @@ public:
 };
 
 template<class T>
-void NexusStack::Frame::push_primitive(const NexusSerializedBytecode::DataType &p_type, const T &p_data) {
+void NexusStack::Frame::push_primitive(const NexusStandardType &p_type, const T &p_data) {
     auto metadata = parent->type_info_server->get_primitive_metadata(p_type);
     if (!metadata) throw NexusStackException("Can not find metadata for primitive type, "
                                              "NexusTypeInfoServer might not have been initialized");
@@ -331,7 +331,7 @@ void NexusStack::Frame::push_primitive(const NexusSerializedBytecode::DataType &
 }
 
 template<class T>
-void NexusStack::Frame::set_primitive(const int64_t &p_idx, const NexusSerializedBytecode::DataType &p_type, const T &p_data) const {
+void NexusStack::Frame::set_primitive(const int64_t &p_idx, const NexusStandardType &p_type, const T &p_data) const {
     auto metadata = parent->type_info_server->get_primitive_metadata(p_type);
     if (!metadata) throw NexusStackException("Can not find metadata for primitive type, "
                                              "NexusTypeInfoServer might not have been initialized");

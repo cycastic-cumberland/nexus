@@ -11,7 +11,7 @@
 #include <thread>
 
 namespace NexusUtils {
-    static void batch_copy(uint8_t p_thread_no, uint8_t p_thread_count, void* p_dst, const void* p_src, size_t p_size){
+    static void batch_copy_job(uint8_t p_thread_no, uint8_t p_thread_count, void* p_dst, const void* p_src, size_t p_size){
         size_t partition_size = p_size / p_thread_count;
         size_t offset = partition_size * p_thread_no;
         if (p_thread_no == p_thread_count - 1)
@@ -21,19 +21,10 @@ namespace NexusUtils {
     }
     static void batch_copy(ThreadPool *p_pool, ThreadPool::Priority p_priority, uint8_t p_thread_count, void* p_dst, const void* p_src, size_t p_size){
         static constexpr auto wait_time = 10;
-        auto flags = new bool[p_thread_count];
-        for (uint8_t thread_no = 0; thread_no < p_thread_count; thread_no++){
-            auto flag = &flags[thread_no];
-            *flag = false;
-            (p_pool->queue_task(p_priority, [flag](uint8_t p_thread_no, uint8_t p_thread_count, void* p_dst, const void* p_src, size_t p_size) -> void {
-                batch_copy(p_thread_no, p_thread_count, p_dst, p_src, p_size);
-                *flag = true;
-            }, thread_no, p_thread_count, p_dst, p_src, p_size));
-        }
-        for (uint8_t thread_no = 0; thread_no < p_thread_count; thread_no++){
-            while (!flags[thread_no]) {}
-        }
-        delete[] flags;
+        if (p_thread_count == 0) p_thread_count = p_pool->get_thread_count();
+        auto promise = p_pool->queue_group_task(p_priority, p_thread_count, batch_copy_job,
+                p_dst, p_src, p_size);
+        promise.wait();
     }
 }
 

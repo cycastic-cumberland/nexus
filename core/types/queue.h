@@ -25,6 +25,9 @@ private:
     QueueNode* last{};
     size_t size_cache{};
 public:
+    _NO_DISCARD_ _FORCE_INLINE_ size_t size() const { return size_cache; }
+    _NO_DISCARD_ _FORCE_INLINE_ bool empty() const { return size() == 0; }
+    _NO_DISCARD_ _FORCE_INLINE_ const QueueNode* first() const { return genesis; }
     _FORCE_INLINE_ void enqueue(const T& p_value){
         auto new_node = new QueueNode();
         new_node->value = p_value;
@@ -47,14 +50,16 @@ public:
         size_cache--;
         return re;
     }
+    _FORCE_INLINE_ bool try_dequeue(T& p_value) {
+        if (empty()) return false;
+        p_value = dequeue();
+        return true;
+    }
     _FORCE_INLINE_ void clear(){
         while (!empty()){
             dequeue();
         }
     }
-    _NO_DISCARD_ _FORCE_INLINE_ size_t size() const { return size_cache; }
-    _NO_DISCARD_ _FORCE_INLINE_ bool empty() const { return size() == 0; }
-    _NO_DISCARD_ _FORCE_INLINE_ const QueueNode* first() const { return genesis; }
     Queue() = default;
     Queue(const Queue& p_other){
         for (auto it = p_other.first(); it != nullptr; it = it->forward()){

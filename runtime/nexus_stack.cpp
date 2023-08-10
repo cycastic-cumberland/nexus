@@ -74,34 +74,34 @@ void NexusTypeInfoServer::add_builtin_types() {
                                           StackStructItemMetadata::default_struct_copy_constructor,
                                           StackStructItemMetadata::default_assignment_operator,
                                           StackStructItemMetadata::default_struct_destructor);
-        add_vtable(vtable, NexusSerializedBytecode::STACK_STRUCT);
+        add_vtable(vtable, NexusStandardType::STACK_STRUCT);
     }
     // No STACK_STRUCT metadata, as it should not be situated on the stack, all struct type must have its custom metadata class
-    ADD_TYPE(NexusSerializedBytecode::UNSIGNED_32_BIT_INTEGER, uint32_t, numeric_constructor<uint32_t>,
+    ADD_TYPE(NexusStandardType::UNSIGNED_32_BIT_INTEGER, uint32_t, numeric_constructor<uint32_t>,
              generic_copy_constructor<uint32_t>, generic_copy_assignment<uint32_t>, empty_destructor)
-    ADD_TYPE(NexusSerializedBytecode::SIGNED_32_BIT_INTEGER, int32_t, numeric_constructor<int32_t>,
+    ADD_TYPE(NexusStandardType::SIGNED_32_BIT_INTEGER, int32_t, numeric_constructor<int32_t>,
              generic_copy_constructor<int32_t>, generic_copy_assignment<int32_t>, empty_destructor)
-    ADD_TYPE(NexusSerializedBytecode::UNSIGNED_64_BIT_INTEGER, uint64_t, numeric_constructor<uint64_t>,
+    ADD_TYPE(NexusStandardType::UNSIGNED_64_BIT_INTEGER, uint64_t, numeric_constructor<uint64_t>,
              generic_copy_constructor<uint64_t>, generic_copy_assignment<uint64_t>, empty_destructor)
-    ADD_TYPE(NexusSerializedBytecode::UNSIGNED_64_BIT_INTEGER, int64_t, numeric_constructor<int64_t>,
+    ADD_TYPE(NexusStandardType::UNSIGNED_64_BIT_INTEGER, int64_t, numeric_constructor<int64_t>,
              generic_copy_constructor<int64_t>, generic_copy_assignment<int64_t>, empty_destructor)
-    ADD_TYPE(NexusSerializedBytecode::SINGLE_PRECISION_FLOATING_POINT, float, numeric_constructor<float>,
+    ADD_TYPE(NexusStandardType::SINGLE_PRECISION_FLOATING_POINT, float, numeric_constructor<float>,
              generic_copy_constructor<float>, generic_copy_assignment<float>, empty_destructor)
-    ADD_TYPE(NexusSerializedBytecode::DOUBLE_PRECISION_FLOATING_POINT, double, numeric_constructor<double>,
+    ADD_TYPE(NexusStandardType::DOUBLE_PRECISION_FLOATING_POINT, double, numeric_constructor<double>,
              generic_copy_constructor<double>, generic_copy_assignment<double>, empty_destructor)
-    ADD_TYPE(NexusSerializedBytecode::STRING_LITERAL, InternedString, generic_constructor<InternedString>,
+    ADD_TYPE(NexusStandardType::STRING_LITERAL, InternedString, generic_constructor<InternedString>,
              generic_copy_constructor<InternedString>, generic_copy_assignment<InternedString>, generic_destructor<InternedString>)
-    ADD_TYPE(NexusSerializedBytecode::STRING, VString, generic_constructor<VString>,
+    ADD_TYPE(NexusStandardType::STRING, VString, generic_constructor<VString>,
              generic_copy_constructor<VString>, generic_copy_assignment<VString>, generic_destructor<VString>)
-    ADD_TYPE(NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT, Ref<ManagedObject>, generic_constructor<Ref<ManagedObject>>,
+    ADD_TYPE(NexusStandardType::REFERENCE_COUNTED_OBJECT, Ref<ManagedObject>, generic_constructor<Ref<ManagedObject>>,
              generic_copy_constructor<Ref<ManagedObject>>, generic_copy_assignment<Ref<ManagedObject>>, generic_destructor<Ref<ManagedObject>>)
-    ADD_TYPE(NexusSerializedBytecode::METHOD, size_t, numeric_constructor<size_t>,
+    ADD_TYPE(NexusStandardType::METHOD, size_t, numeric_constructor<size_t>,
              generic_copy_constructor<size_t>, generic_copy_assignment<size_t>, empty_destructor)
     // No NONE
 
     // Skip an ID? Whatever...
-    metadata_id_allocator.set(NexusSerializedBytecode::MAX_TYPE);
-    vtable_id_allocator.set(NexusSerializedBytecode::MAX_TYPE);
+    metadata_id_allocator.set(NexusStandardType::MAX_TYPE);
+    vtable_id_allocator.set(NexusStandardType::MAX_TYPE);
 #undef ADD_TYPE
 }
 
@@ -191,43 +191,43 @@ void NexusStack::Frame::push(const StackItemMetadata* p_metadata, const void* p_
 }
 
 void NexusStack::Frame::push(const uint32_t &p_u32) {
-    push_primitive(NexusSerializedBytecode::UNSIGNED_32_BIT_INTEGER, p_u32);
+    push_primitive(NexusStandardType::UNSIGNED_32_BIT_INTEGER, p_u32);
 }
 
 void NexusStack::Frame::push(const int32_t &p_i32) {
-    push_primitive(NexusSerializedBytecode::SIGNED_32_BIT_INTEGER, p_i32);
+    push_primitive(NexusStandardType::SIGNED_32_BIT_INTEGER, p_i32);
 }
 
 void NexusStack::Frame::push(const uint64_t &p_u64) {
-    push_primitive(NexusSerializedBytecode::UNSIGNED_64_BIT_INTEGER, p_u64);
+    push_primitive(NexusStandardType::UNSIGNED_64_BIT_INTEGER, p_u64);
 }
 
 void NexusStack::Frame::push(const int64_t &p_i64) {
-    push_primitive(NexusSerializedBytecode::SIGNED_64_BIT_INTEGER, p_i64);
+    push_primitive(NexusStandardType::SIGNED_64_BIT_INTEGER, p_i64);
 }
 
 void NexusStack::Frame::push(const float &p_f32) {
-    push_primitive(NexusSerializedBytecode::SINGLE_PRECISION_FLOATING_POINT, p_f32);
+    push_primitive(NexusStandardType::SINGLE_PRECISION_FLOATING_POINT, p_f32);
 }
 
 void NexusStack::Frame::push(const double &p_f64) {
-    push_primitive(NexusSerializedBytecode::DOUBLE_PRECISION_FLOATING_POINT, p_f64);
+    push_primitive(NexusStandardType::DOUBLE_PRECISION_FLOATING_POINT, p_f64);
 }
 
 void NexusStack::Frame::push(const wchar_t *p_str) {
-    push_primitive(NexusSerializedBytecode::STRING_LITERAL, InternedString(p_str));
+    push_primitive(NexusStandardType::STRING_LITERAL, InternedString(p_str));
 }
 
 void NexusStack::Frame::push(const InternedString& p_str) {
-    push_primitive(NexusSerializedBytecode::STRING_LITERAL, p_str);
+    push_primitive(NexusStandardType::STRING_LITERAL, p_str);
 }
 
 void NexusStack::Frame::push(const VString &p_string) {
-    push_primitive(NexusSerializedBytecode::STRING, p_string);
+    push_primitive(NexusStandardType::STRING, p_string);
 }
 
 void NexusStack::Frame::push(const Ref<ManagedObject> &p_ref_counted) {
-    push_primitive(NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT, p_ref_counted);
+    push_primitive(NexusStandardType::REFERENCE_COUNTED_OBJECT, p_ref_counted);
 }
 
 void NexusStack::Frame::set(const int64_t &p_idx, const NexusStack::ObjectInfo &p_info) const {
@@ -243,45 +243,45 @@ void NexusStack::Frame::set(const int64_t &p_idx, const StackItemMetadata *p_met
 }
 
 void NexusStack::Frame::set(const int64_t &p_idx, const uint32_t &p_u32) const {
-    set_primitive(p_idx, NexusSerializedBytecode::UNSIGNED_32_BIT_INTEGER, p_u32);
+    set_primitive(p_idx, NexusStandardType::UNSIGNED_32_BIT_INTEGER, p_u32);
 }
 
 void NexusStack::Frame::set(const int64_t &p_idx, const int32_t &p_i32) const {
-    set_primitive(p_idx, NexusSerializedBytecode::SIGNED_32_BIT_INTEGER, p_i32);
+    set_primitive(p_idx, NexusStandardType::SIGNED_32_BIT_INTEGER, p_i32);
 }
 
 void NexusStack::Frame::set(const int64_t &p_idx, const uint64_t &p_u64) const {
-    set_primitive(p_idx, NexusSerializedBytecode::UNSIGNED_64_BIT_INTEGER, p_u64);
+    set_primitive(p_idx, NexusStandardType::UNSIGNED_64_BIT_INTEGER, p_u64);
 }
 
 void NexusStack::Frame::set(const int64_t &p_idx, const int64_t &p_i64) const {
-    set_primitive(p_idx, NexusSerializedBytecode::SIGNED_64_BIT_INTEGER, p_i64);
+    set_primitive(p_idx, NexusStandardType::SIGNED_64_BIT_INTEGER, p_i64);
 }
 
 void NexusStack::Frame::set(const int64_t &p_idx, const float &p_f32) const {
-    set_primitive(p_idx, NexusSerializedBytecode::SINGLE_PRECISION_FLOATING_POINT, p_f32);
+    set_primitive(p_idx, NexusStandardType::SINGLE_PRECISION_FLOATING_POINT, p_f32);
 }
 
 void NexusStack::Frame::set(const int64_t &p_idx, const double &p_f64) const {
-    set_primitive(p_idx, NexusSerializedBytecode::DOUBLE_PRECISION_FLOATING_POINT, p_f64);
+    set_primitive(p_idx, NexusStandardType::DOUBLE_PRECISION_FLOATING_POINT, p_f64);
 }
 
 void NexusStack::Frame::set(const int64_t &p_idx, const wchar_t *p_str) const {
     throw NexusStackException("Can not set an InternedString's value");
-//    set_primitive(p_idx, NexusSerializedBytecode::STRING_LITERAL, InternedString(p_str));
+//    set_primitive(p_idx, NexusStandardType::STRING_LITERAL, InternedString(p_str));
 }
 
 void NexusStack::Frame::set(const int64_t &p_idx, const InternedString &p_str) const {
     throw NexusStackException("Can not set an InternedString's value");
-//    set_primitive(p_idx, NexusSerializedBytecode::UNSIGNED_32_BIT_INTEGER, p_str);
+//    set_primitive(p_idx, NexusStandardType::UNSIGNED_32_BIT_INTEGER, p_str);
 }
 
 void NexusStack::Frame::set(const int64_t &p_idx, const VString &p_string) const {
-    set_primitive(p_idx, NexusSerializedBytecode::STRING_LITERAL, p_string);
+    set_primitive(p_idx, NexusStandardType::STRING_LITERAL, p_string);
 }
 
 void NexusStack::Frame::set(const int64_t &p_idx, const Ref<ManagedObject> &p_ref_counted) const {
-    set_primitive(p_idx, NexusSerializedBytecode::REFERENCE_COUNTED_OBJECT, p_ref_counted);
+    set_primitive(p_idx, NexusStandardType::REFERENCE_COUNTED_OBJECT, p_ref_counted);
 }
 
 void NexusStack::Frame::pop() {
@@ -326,8 +326,8 @@ NexusStack::NexusStack(const NexusTypeInfoServer *p_type_info_server, const size
 allocated(0), current_object_count(0), stack_frames(p_initial_frame_capacity),
 type_info_server(p_type_info_server), object_info(p_initial_frame_capacity) {}
 
-Box<NexusStack::Frame, UnsafeObject> &NexusStack::push_stack_frame() {
-    stack_frames.emplace(Box<Frame, UnsafeObject>::make_box(this));
+Box<NexusStack::Frame, ThreadUnsafeObject> &NexusStack::push_stack_frame() {
+    stack_frames.emplace(Box<Frame, ThreadUnsafeObject>::make_box(this));
     return get_last_frame();
 }
 
@@ -337,14 +337,14 @@ bool NexusStack::pop_stack_frame() {
     return true;
 }
 
-Box<NexusStack::Frame, UnsafeObject> &NexusStack::get_last_frame() {
+Box<NexusStack::Frame, ThreadUnsafeObject> &NexusStack::get_last_frame() {
     return stack_frames.modify_last();
 }
 
-const Box<NexusStack::Frame, UnsafeObject> &NexusStack::get_last_frame() const {
+const Box<NexusStack::Frame, ThreadUnsafeObject> &NexusStack::get_last_frame() const {
     return stack_frames.peek_last();
 }
 
-const Box<NexusStack::Frame, UnsafeObject> &NexusStack::get_frame_at(const int64_t &p_idx) const {
+const Box<NexusStack::Frame, ThreadUnsafeObject> &NexusStack::get_frame_at(const int64_t &p_idx) const {
     return stack_frames.peek_at(p_idx);
 }

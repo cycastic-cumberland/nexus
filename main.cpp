@@ -12,8 +12,7 @@
 
 int main(int argc, char** argv) {
     CmdHandler::load_cmd_arguments(argc, argv);
-
-    int result = 0;
+    int result{};
 #ifdef BENCHMARKS_ENABLED
     std::cout << "-------------------------------- BENCHMARK --------------------------------\n";
     ::benchmark::Initialize(&argc, argv);

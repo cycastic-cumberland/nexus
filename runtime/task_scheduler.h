@@ -29,7 +29,7 @@ private:
     RWLock lock{};
     SafeNumeric<uint32_t> task_id_allocator{0};
     SafeFlag is_terminating{false};
-    HashMap<Ref<Task>, Ref<Task>, 32, Task, Task> frozen_tasks{};
+    HashMap<Ref<Task>, Ref<Task>, Task, Task> frozen_tasks{};
     ThreadPool* thread_pool;
 
     static _ALWAYS_INLINE_ TaskScheduler* get_singleton() { return singleton; }

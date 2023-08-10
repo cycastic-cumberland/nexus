@@ -111,15 +111,15 @@ public:
         add_node_front(new_node);
     }
     _FORCE_INLINE_ void insert_after(const T& p_data, const LinkedListNode* p_node){
-        if (!p_node) throw LinkedListException("Linked list node is null");
-        if (p_node->master != this) throw LinkedListException("Linked list does not own this node");
+        if (!p_node) throw LinkedListException("Linked list to_node is null");
+        if (p_node->master != this) throw LinkedListException("Linked list does not own this to_node");
         auto new_node = new LinkedListNode(p_data, this);
         insert_node_after(p_node, new_node);
     }
     template<class ...Args>
     _FORCE_INLINE_ void emplace_after(const LinkedListNode* p_node, Args&& ...args){
-        if (!p_node) throw LinkedListException("Linked list node is null");
-        if (p_node->master != this) throw LinkedListException("Linked list does not own this node");
+        if (!p_node) throw LinkedListException("Linked list to_node is null");
+        if (p_node->master != this) throw LinkedListException("Linked list does not own this to_node");
         auto new_node = new LinkedListNode(T(args...), this);
         insert_node_after(p_node, new_node);
     }

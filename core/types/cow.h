@@ -40,9 +40,6 @@ private:
         auto new_data = new CowData();
         new_data->data = (T*) malloc(sizeof(T) * cow_data->capacity);
         memcpy(new_data->data, cow_data->data, cow_data->capacity * sizeof(T));
-        for (size_t i = 0; i < cow_data->capacity; i++){
-            new (&new_data->data[i]) T(cow_data->data[i]);
-        }
         new_data->capacity = cow_data->capacity;
         unref();
         cow_data = new_data;
@@ -60,7 +57,7 @@ public:
         unref();
     }
     _FORCE_INLINE_ void clear(){
-        move();
+//        move();
         free(cow_data->data);
         cow_data->data = nullptr;
         cow_data->capacity = 0;

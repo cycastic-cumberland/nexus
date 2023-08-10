@@ -7,6 +7,12 @@
 
 #include "../hashfuncs.h"
 #include "../comparator.h"
+#include "../exception.h"
+
+class HashMapException : public Exception {
+public:
+    explicit HashMapException(const char *p_msg) : Exception(p_msg) {}
+};
 
 template <typename Key, typename Value, class Hasher = StandardHasher, class Comparator = StandardComparator<Key>>
 class StaticHashMap{
@@ -17,8 +23,13 @@ private:
         KeyPairValue* next{};
 
         explicit KeyPairValue(const Key& p_key) { key = p_key; }
-        ~KeyPairValue(){
-            delete next;
+        static _FORCE_INLINE_ void cleanup(KeyPairValue* p_target){
+            auto it = p_target;
+            while (it){
+                auto removal_target = it;
+                it = it->next;
+                delete removal_target;
+            }
         }
     };
 private:
@@ -45,7 +56,7 @@ private:
     const KeyPairValue* get(const Key& p_key) const {
         auto result = try_get(p_key);
         if (!result)
-            throw std::exception();
+            throw HashMapException("p_key not found");
         return result;
     }
     KeyPairValue* get_or_create(const Key& p_key){
@@ -79,11 +90,14 @@ private:
         }
         return false;
     }
-    void reset_table(){
+    void free_all_cells(){
         for (size_t i = 0; i < cap; i++){
-            delete entries[i];
+            KeyPairValue::cleanup(entries[i]);
         }
         free(entries);
+    }
+    void reset_table(){
+        free_all_cells();
         entries = array_alloc<KeyPairValue*>(cap);
         for (size_t i = 0; i < cap; i++){
             entries[i] = nullptr;
@@ -149,8 +163,8 @@ public:
             if (!iterating) map = nullptr;
             return iterating != nullptr;
         }
-        _FORCE_INLINE_ void erase(){
-            if (map == nullptr) return;
+        void erase(){
+            if (!map || !iterating) return;
             if (prev_iterator){
                 prev_iterator->next = iterating->next;
             } else {
@@ -161,11 +175,13 @@ public:
             map->entries_count--;
             if (map->entries_count == 0) map = nullptr;
         }
-        _FORCE_INLINE_ const KeyPairValue& get_pair() const {
+        _FORCE_INLINE_ KeyPairValue& get_pair() {
             return *iterating;
         }
     };
     _NO_DISCARD_ _ALWAYS_INLINE_ uint16_t capacity() const { return cap; }
+    _NO_DISCARD_ _FORCE_INLINE_ size_t size() const { return entries_count; }
+    _NO_DISCARD_ _FORCE_INLINE_ bool empty() const { return size() == 0; }
     _NO_DISCARD_ _ALWAYS_INLINE_ ConstIterator const_iterator() const { return ConstIterator(this); }
     _NO_DISCARD_ _ALWAYS_INLINE_ Iterator iterator() { return Iterator(this); }
 private:
@@ -179,22 +195,20 @@ public:
     _FORCE_INLINE_ const Value& operator[](const Key& p_key) const { return get(p_key)->value; }
     _FORCE_INLINE_ Value& operator[](const Key& p_key) { return get_or_create(p_key)->value; }
     _NO_DISCARD_ _FORCE_INLINE_ bool exists(const Key& p_key) const { return try_get(p_key) != nullptr; }
-    _NO_DISCARD_ _FORCE_INLINE_ size_t size() const { return entries_count; }
-    _NO_DISCARD_ _FORCE_INLINE_ bool empty() const { return size() == 0; }
+    _FORCE_INLINE_ void clear() { reset_table(); }
     _FORCE_INLINE_ StaticHashMap& operator=(const StaticHashMap& p_other){
-        clear();
+        reset_table();
         copy_from(p_other);
         return *this;
     }
     _FORCE_INLINE_ bool erase(const Key& p_key) noexcept { return try_erase(p_key); }
-    _FORCE_INLINE_ void clear() { reset_table(); }
     _FORCE_INLINE_ bool try_get(const Key& p_key, Value& p_value) const {
         auto pair = try_get(p_key);
         if (pair == nullptr) return false;
         p_value = pair->value;
         return true;
     }
-    explicit StaticHashMap(const size_t& starting_capacity = 150){
+    explicit StaticHashMap(const size_t& starting_capacity = 128){
         cap = starting_capacity;
         entries = array_alloc<KeyPairValue*>(cap);
         for (size_t i = 0; i < cap; i++){
@@ -202,14 +216,11 @@ public:
         }
     }
     ~StaticHashMap(){
-        for (size_t i = 0; i < cap; i++){
-            delete entries[i];
-        }
-        free(entries);
+        free_all_cells();
     }
 };
 
-template <typename Key, typename Value, uint16_t StartingCapacity = 32, class Hasher = StandardHasher, class Comparator = StandardComparator<Key>>
+template <typename Key, typename Value, class Hasher = StandardHasher, class Comparator = StandardComparator<Key>>
 class HashMap {
 public:
     class EmptyConstIterator : public StaticHashMap<Key, Value, Hasher, Comparator>::ConstIterator {
@@ -221,56 +232,24 @@ public:
         EmptyIterator() : StaticHashMap<Key, Value, Hasher, Comparator>::Iterator(nullptr) {}
     };
 private:
+    const size_t initial_capacity;
     float growth_factor;
     StaticHashMap<Key, Value, Hasher, Comparator> *current_map = nullptr;
+    _FORCE_INLINE_ void initialize(const size_t& p_capacity){
+        current_map = new StaticHashMap<Key, Value, Hasher, Comparator>(p_capacity);
+    }
     _FORCE_INLINE_ void initialize(){
-        current_map = new StaticHashMap<Key, Value, Hasher, Comparator>(StartingCapacity);
+        initialize(initial_capacity);
     }
 public:
     _NO_DISCARD_ _ALWAYS_INLINE_ bool is_initialized() const { return current_map != nullptr; }
-    _FORCE_INLINE_ uint32_t get_index(const Key& p_key) const {
+    _NO_DISCARD_ _FORCE_INLINE_ uint32_t get_index(const Key& p_key) {
         if (!is_initialized()) initialize();
         return current_map->get_index(p_key);
     }
     _FORCE_INLINE_ void clear(){
-        if (!is_initialized()) return;
         delete current_map;
         current_map = nullptr;
-    }
-private:
-    _FORCE_INLINE_ void copy(const HashMap& p_other){
-        clear(); initialize();
-        auto it = p_other.const_iterator();
-        while (it.move_next()){
-            operator[](it.get_pair().key) = it.get_pair().value;
-        }
-    }
-public:
-    _FORCE_INLINE_ const Value& operator[](const Key& p_key) const {
-        // TODO: Custom Exception
-        if (!is_initialized()) throw std::exception();
-        return current_map->operator[](p_key);
-    }
-    _FORCE_INLINE_ Value& operator[](const Key& p_key) {
-        // TODO: Custom Exception
-        // Resize
-        if (!is_initialized()) initialize();
-        const auto curr_factor = (float)size() / capacity();
-        if (curr_factor >= growth_factor){
-            auto new_map = new StaticHashMap<Key, Value, Hasher, Comparator>(capacity() * 2);
-            auto it = current_map->const_iterator();
-            while (it.move_next()){
-                const auto& kp = it.get_pair();
-                new_map->operator[](kp.key) = kp.value;
-            }
-            delete current_map;
-            current_map = new_map;
-        }
-        return current_map->operator[](p_key);
-    }
-    _FORCE_INLINE_ HashMap& operator=(const HashMap& p_other){
-        copy(p_other);
-        return *this;
     }
     _NO_DISCARD_ _FORCE_INLINE_ bool has(const Key& p_key) const {
         if (!is_initialized()) return false;
@@ -303,15 +282,50 @@ public:
         if (!is_initialized()) return false;
         return current_map->try_get(p_key, p_value);
     }
-    explicit HashMap(const float& growth = 0.75){
-        growth_factor = growth;
+private:
+    _FORCE_INLINE_ void copy(const HashMap& p_other){
+        auto new_cap = p_other.capacity();
+        initialize(new_cap ? new_cap : initial_capacity);
+        auto it = p_other.const_iterator();
+        while (it.move_next()){
+            current_map->operator[](it.get_pair().key) = it.get_pair().value;
+        }
     }
-    HashMap(const HashMap& p_other) : HashMap() {
-        growth_factor = p_other.growth_factor;
+public:
+    _FORCE_INLINE_ HashMap& operator=(const HashMap& p_other){
+        clear();
+        copy(p_other);
+        return *this;
+    }
+    _FORCE_INLINE_ const Value& operator[](const Key& p_key) const {
+        if (!is_initialized()) throw HashMapException("HashMap is empty");
+        return current_map->operator[](p_key);
+    }
+    _FORCE_INLINE_ Value& operator[](const Key& p_key) {
+        // Resize
+        if (!is_initialized()) initialize();
+        const auto curr_factor = float(size()) / capacity();
+        if (curr_factor >= growth_factor){
+            auto new_map = new StaticHashMap<Key, Value, Hasher, Comparator>(capacity() * 2);
+            auto it = current_map->const_iterator();
+            while (it.move_next()){
+                const auto& kp = it.get_pair();
+                new_map->operator[](kp.key) = kp.value;
+            }
+            delete current_map;
+            current_map = new_map;
+        }
+        return current_map->operator[](p_key);
+    }
+    explicit HashMap(const float& p_growth = 0.75, const size_t& p_initial_capacity = 128, const bool& p_lazy_evaluation = true)
+    : growth_factor(p_growth), initial_capacity(p_initial_capacity){
+        if (!p_lazy_evaluation) initialize();
+    }
+    HashMap(const HashMap& p_other) : growth_factor(p_other.growth_factor), initial_capacity(p_other.initial_capacity) {
         copy(p_other);
     }
     ~HashMap() {
-        delete current_map;
+        clear();
     }
 };
 

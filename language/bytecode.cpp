@@ -4,7 +4,6 @@
 
 #include "bytecode.h"
 #include "../core/types/stack.h"
-#include "../core/types/stack_struct.h"
 #include "../runtime/nexus_stack.h"
 
 void NexusBytecode::load_header(const FilePointer &p_file) {
@@ -19,12 +18,6 @@ void NexusBytecode::load_header(const FilePointer &p_file) {
     if (bytecode_metadata->magic != MAGIC) throw BytecodeParseException("Incorrect magic sequence");
     if (bytecode_metadata->version != VERSION) throw BytecodeParseException("Version not supported");
     bytecode_metadata.unref();
-//    COLLECT_CONSTANTS(get_32, u32_constants)
-//    COLLECT_CONSTANTS(get_64, u64_constants)
-//    COLLECT_CONSTANTS(get_float, f32_constants)
-//    COLLECT_CONSTANTS(get_double, f64_constants)
-//    COLLECT_CONSTANTS(get_string, string_literals)
-    // Read method metadata_record
     auto method_count = p_file->get_32();
     methods_metadata = Vector<Ref<NexusBytecodeMethodMetadata>>(method_count);
     for (int i = 0; i < method_count; i++){
@@ -64,18 +57,12 @@ void NexusBytecode::serialize(FilePointer &p_file) const {
     }                                                   \
 }
     // Cache
-    HashMap<VString, uint64_t> method_metadata_offset_loc{};
-    HashMap<VString, uint64_t> method_body_offset_loc{};
+    HashMap<InternedString, uint64_t> method_metadata_offset_loc{};
+    HashMap<InternedString, uint64_t> method_body_offset_loc{};
     // Store header
     Ref<NexusBytecodeMetadata> header = Ref<NexusBytecodeMetadata>::make_ref(MAGIC, VERSION);
     header->serialize(p_file);
     header.unref();
-    // Store constants
-//    STORE_CONSTANTS(store_32, u32_constants)
-//    STORE_CONSTANTS(store_64, u64_constants)
-//    STORE_CONSTANTS(store_float, f32_constants)
-//    STORE_CONSTANTS(store_double, f64_constants)
-//    STORE_CONSTANTS(store_string, string_literals)
     // Store methods metadata_record
     p_file->store_32(methods_metadata.size());
     for (const auto& item : methods_metadata){
@@ -107,45 +94,38 @@ void NexusBytecodeRawInstruction::deserialize(const FilePointer& p_file) {
     auto argc = p_file->get_8();
     arguments = Vector<Ref<NexusBytecodeArgument>>(argc);
     for (unsigned char i = 0; i < argc; i++){
-        auto arg_type = (NexusSerializedBytecode::DataType)p_file->get_8();
+        auto arg_type = (NexusStandardType)p_file->get_8();
         NexusBytecodeArgument* argument = nullptr;
+        // Only accept constants
         switch (arg_type){
-            case STACK_STRUCT: {
-                auto stack_struct_item_count = p_file->get_8();
-                Vector<Ref<NexusBytecodeArgument>> args = Vector<Ref<NexusBytecodeArgument>>(stack_struct_item_count);
-                for (uint8_t i = 0; i < stack_struct_item_count; i++){
-                    args.push_back(Ref<NexusBytecodeArgument>::make_ref());
-                    args[i]->type = (NexusSerializedBytecode::DataType)p_file->get_8();
-                }
-                argument = new NexusBytecodeArgument(new StackStructMetadata(args));
-                break;
-            }
-            case UNSIGNED_32_BIT_INTEGER:
+            case NexusStandardType::UNSIGNED_32_BIT_INTEGER:
                 argument = new NexusBytecodeArgument(p_file->get_32());
                 break;
-            case SIGNED_32_BIT_INTEGER:
+            case NexusStandardType::SIGNED_32_BIT_INTEGER:
                 argument = new NexusBytecodeArgument((int32_t)p_file->get_32());
                 break;
-            case UNSIGNED_64_BIT_INTEGER:
+            case NexusStandardType::UNSIGNED_64_BIT_INTEGER:
                 argument = new NexusBytecodeArgument(p_file->get_64());
                 break;
-            case SIGNED_64_BIT_INTEGER:
+            case NexusStandardType::SIGNED_64_BIT_INTEGER:
                 argument = new NexusBytecodeArgument((int64_t)p_file->get_64());
                 break;
-            case SINGLE_PRECISION_FLOATING_POINT:
+            case NexusStandardType::SINGLE_PRECISION_FLOATING_POINT:
                 argument = new NexusBytecodeArgument(p_file->get_float());
                 break;
-            case DOUBLE_PRECISION_FLOATING_POINT:
+            case NexusStandardType::DOUBLE_PRECISION_FLOATING_POINT:
                 argument = new NexusBytecodeArgument(p_file->get_double());
                 break;
-            case STRING_LITERAL:
-                argument = new NexusBytecodeArgument(p_file->get_string());
+            case NexusStandardType::STRING_LITERAL:
+                argument = new NexusBytecodeArgument(InternedString(p_file->get_string()));
                 break;
             // Not supported / Can never be here
-            case METHOD:
-            case STRING:
-            case REFERENCE_COUNTED_OBJECT:
-            case NONE:
+            case NexusStandardType::STACK_STRUCT:
+            case NexusStandardType::METHOD:
+            case NexusStandardType::STRING:
+            case NexusStandardType::REFERENCE_COUNTED_OBJECT:
+            case NexusStandardType::NONE:
+            case NexusStandardType::MAX_TYPE:
                 throw BytecodeParseException("Type not supported");
         }
         Ref<NexusBytecodeArgument> as_ref = Ref<NexusBytecodeArgument>::from_uninitialized_object(argument);
@@ -159,40 +139,34 @@ void NexusBytecodeRawInstruction::serialize(FilePointer& p_file) const {
         auto type = item->type;
         p_file->store_8((uint8_t)type);
         switch (type){
-            case STACK_STRUCT:{
-                const auto& as_ssm = item->get_data<StackStructMetadata>();
-                p_file->store_8(as_ssm.struct_metadata.size());
-                for (const auto& it : as_ssm.struct_metadata){
-                    p_file->store_8(it->type);
-                }
-                break;
-            }
-            case UNSIGNED_32_BIT_INTEGER:
+            case NexusStandardType::UNSIGNED_32_BIT_INTEGER:
                 p_file->store_32(item->get_data<uint32_t>());
                 break;
-            case SIGNED_32_BIT_INTEGER:
+            case NexusStandardType::SIGNED_32_BIT_INTEGER:
                 p_file->store_32(item->get_data<int32_t>());
                 break;
-            case UNSIGNED_64_BIT_INTEGER:
+            case NexusStandardType::UNSIGNED_64_BIT_INTEGER:
                 p_file->store_64(item->get_data<uint64_t>());
                 break;
-            case SIGNED_64_BIT_INTEGER:
+            case NexusStandardType::SIGNED_64_BIT_INTEGER:
                 p_file->store_64(item->get_data<int64_t>());
                 break;
-            case SINGLE_PRECISION_FLOATING_POINT:
+            case NexusStandardType::SINGLE_PRECISION_FLOATING_POINT:
                 p_file->store_float(item->get_data<float>());
                 break;
-            case DOUBLE_PRECISION_FLOATING_POINT:
+            case NexusStandardType::DOUBLE_PRECISION_FLOATING_POINT:
                 p_file->store_double(item->get_data<double>());
                 break;
-            case STRING_LITERAL:
-                p_file->store_string(item->get_data<VString>());
+            case NexusStandardType::STRING_LITERAL:
+                p_file->store_string(item->get_data<InternedString>());
                 break;
             // Not supported / Can never be here
-            case METHOD:
-            case STRING:
-            case REFERENCE_COUNTED_OBJECT:
-            case NONE:
+            case NexusStandardType::STACK_STRUCT:
+            case NexusStandardType::METHOD:
+            case NexusStandardType::STRING:
+            case NexusStandardType::REFERENCE_COUNTED_OBJECT:
+            case NexusStandardType::NONE:
+            case NexusStandardType::MAX_TYPE:
                 throw BytecodeParseException("Type not supported");
         }
     }
@@ -203,7 +177,7 @@ void NexusBytecodeMethodBody::read_header(const FilePointer &p_file) {
     auto argc = p_file->get_8();
     arguments = Vector<Ref<NexusBytecodeArgument>>(argc);
     for (unsigned char i = 0; i < argc; i++){
-        auto arg_type = (NexusSerializedBytecode::DataType)p_file->get_8();
+        auto arg_type = (NexusStandardType)p_file->get_8();
         Ref<NexusBytecodeArgument> arg = Ref<NexusBytecodeArgument>::make_ref(arg_type);
         arguments.push_back(arg);
     }
@@ -212,7 +186,7 @@ void NexusBytecodeMethodBody::read_header(const FilePointer &p_file) {
     auto locals_init_count = p_file->get_32();
     locals_init = Vector<Ref<NexusBytecodeArgument>>(locals_init_count);
     for (uint32_t i = 0; i < locals_init_count; i++){
-        auto arg_type = (NexusSerializedBytecode::DataType)p_file->get_8();
+        auto arg_type = (NexusStandardType)p_file->get_8();
         Ref<NexusBytecodeArgument> arg = Ref<NexusBytecodeArgument>::make_ref(arg_type);
         locals_init.push_back(arg);
     }
@@ -276,13 +250,13 @@ NexusBytecodeInstance::NexusBytecodeInstance(const NexusTypeInfoServer* p_type_i
     }
 }
 
-NexusBytecodeInstance::NexusBytecodeInstance(const NexusTypeInfoServer* p_type_info_server, const VString &p_bc_path,
+NexusBytecodeInstance::NexusBytecodeInstance(const NexusTypeInfoServer* p_type_info_server, const InternedString &p_bc_path,
                                              NexusBytecodeInstance::BytecodeLoadMode p_load_mode)
         : NexusBytecodeInstance(p_type_info_server) {
     load_mode = p_load_mode;
     bytecode = Ref<NexusBytecode>::make_ref();
     file_pointer = FileAccessServer::open(p_bc_path, FileAccess::ACCESS_READ, NexusRuntimeGlobalSettings::get_settings()->bytecode_endian_mode);
-    if (!file_pointer->is_open()) throw BytecodeException(CharString("Failed to open bytecode: ") + p_bc_path.utf8());
+    if (!file_pointer->is_open()) throw BytecodeException(CharString("Failed to open bytecode: ") + p_bc_path.operator VString().utf8());
     switch (load_mode) {
         case LOAD_HEADER:
         case LOAD_ALL:
@@ -305,7 +279,7 @@ const NexusTypeInfoServer *NexusMethodPointer::get_type_info_server() const {
     return type_info_server;
 }
 
-void NexusMethodPointerJIT::load_method(const Ref<NexusBytecodeInstance>& p_bci, const VString& p_method_name) {
+void NexusMethodPointerJIT::load_method(const Ref<NexusBytecodeInstance>& p_bci, const InternedString& p_method_name) {
     file = FileAccessServer::duplicate_pointer(p_bci->file_pointer);
 
     method_body = Ref<NexusBytecodeMethodBody>::make_ref();
@@ -339,7 +313,7 @@ Vector<Ref<NexusBytecodeArgument>> NexusMethodPointerJIT::get_arguments() const 
     return method_body->arguments;
 }
 
-void NexusMethodPointerMemory::load_method(const Ref<NexusBytecodeInstance>& p_bci, const VString& p_method_name){
+void NexusMethodPointerMemory::load_method(const Ref<NexusBytecodeInstance>& p_bci, const InternedString& p_method_name){
     method_body = p_bci->bytecode->get_bodies_map()[p_method_name];
     method_metadata = p_bci->bytecode->get_metadata_map()[p_method_name];
 }
@@ -366,15 +340,14 @@ NexusBytecodeArgument::~NexusBytecodeArgument() {
         case SIGNED_64_BIT_INTEGER: memdelete((int64_t*)data); break;
         case SINGLE_PRECISION_FLOATING_POINT: memdelete((float*)data); break;
         case DOUBLE_PRECISION_FLOATING_POINT: memdelete((double*)data); break;
-        case STRING_LITERAL: memdelete((VString*)data); break;
-            // Not supported / Should be deleted as address
-        case STACK_STRUCT: memdelete((StackStructMetadata*)data); break;
+        case STRING_LITERAL: memdelete((InternedString*)data); break;
+
+        case STACK_STRUCT:
         case STRING:
         case REFERENCE_COUNTED_OBJECT:
         case METHOD:
-            if (data) memdelete((size_t*)data);
-            break;
         case NONE:
+        case MAX_TYPE:
             break;
     }
 }

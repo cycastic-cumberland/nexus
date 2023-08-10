@@ -30,7 +30,7 @@ void NexusRuntime::cache_method_bodies(const Ref<NexusBytecodeInstance>& instanc
     try {
         while (it.move_next()){
             const auto& method_name = it.get_pair().key;
-            if (bytecode_method_bodies.has(method_name)) throw RuntimeException(CharString("Method already has: ") + method_name.utf8());
+            if (bytecode_method_bodies.has(method_name)) throw RuntimeException(CharString("Method already has: ") + method_name.operator VString().utf8());
             bytecode_method_bodies[method_name] = instance;
         }
     } catch (const std::exception& ex){

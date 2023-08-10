@@ -47,6 +47,11 @@ public:
     _NO_DISCARD_ _FORCE_INLINE_ bool operator!=(const InternedString& p_other) const { return !(*this == p_other); }
     _NO_DISCARD_ _FORCE_INLINE_ uint32_t hash() const { return occupying ? occupying->hash : 0; }
 
+    _NO_DISCARD_ _FORCE_INLINE_ const wchar_t& operator[](const size_t& p_idx) const {
+        if (p_idx >= length()) throw std::out_of_range("Invalid index");
+        return c_str()[p_idx];
+    }
+
     InternedString& operator=(const InternedString& p_other);
     InternedString& operator=(const char* p_from);
     InternedString& operator=(const wchar_t* p_from);

@@ -5,12 +5,12 @@
 #ifndef NEXUS_Bytecode_H
 #define NEXUS_Bytecode_H
 
-#include <cstdint>
 #include "../core/types/vector.h"
-#include "../core/types/char_string.h"
+#include "../core/types/interned_string.h"
 #include "../core/exception.h"
 #include "../core/io/file_access_server.h"
 #include "../runtime/runtime_global_settings.h"
+#include "standard_types.h"
 
 struct StackStructMetadata;
 class NexusTypeInfoServer;
@@ -28,23 +28,23 @@ public:
     explicit BytecodeParseException(const char* message) : BytecodeException(message) {}
 };
 
-struct NexusSerializedBytecode : public UnsafeObject {
+struct NexusSerializedBytecode : public ThreadUnsafeObject {
 public:
-    enum DataType : unsigned char {
-        STACK_STRUCT,
-        UNSIGNED_32_BIT_INTEGER,
-        SIGNED_32_BIT_INTEGER,
-        UNSIGNED_64_BIT_INTEGER,
-        SIGNED_64_BIT_INTEGER,
-        SINGLE_PRECISION_FLOATING_POINT,
-        DOUBLE_PRECISION_FLOATING_POINT,
-        STRING_LITERAL,
-        STRING,
-        REFERENCE_COUNTED_OBJECT,
-        METHOD,
-        NONE,
-        MAX_TYPE,
-    };
+//    enum DataType : unsigned char {
+//        STACK_STRUCT,
+//        UNSIGNED_32_BIT_INTEGER,
+//        SIGNED_32_BIT_INTEGER,
+//        UNSIGNED_64_BIT_INTEGER,
+//        SIGNED_64_BIT_INTEGER,
+//        SINGLE_PRECISION_FLOATING_POINT,
+//        DOUBLE_PRECISION_FLOATING_POINT,
+//        STRING_LITERAL,
+//        STRING,
+//        REFERENCE_COUNTED_OBJECT,
+//        METHOD,
+//        NONE,
+//        MAX_TYPE,
+//    };
     enum OpCode : unsigned int {
         // Unused/deleted instruction
         OPCODE_UNUSED,
@@ -160,9 +160,9 @@ struct NexusBytecodeMethodMetadata : public NexusSerializedBytecode {
         MA_INLINE = 4,
         MA_MAX
     };
-//    uint64_t id;
+    uint64_t id;
     uint32_t attributes;
-    VString method_name;
+    InternedString method_name;
     // Address of method body in file
     uint64_t method_body_offset{};
 private:
@@ -170,13 +170,13 @@ private:
 public:
 
     void deserialize(const FilePointer& p_file) override {
-//        id = p_file->get_64();
+        id = p_file->get_64();
         attributes = p_file->get_32();
         method_name = p_file->get_string();
         method_body_offset = (uint64_t)p_file->get_64();
     }
     void serialize(FilePointer& p_file) const override {
-//        p_file->store_64(id);
+        p_file->store_64(id);
         p_file->store_32(attributes);
         p_file->store_string(method_name);
         offset_from_last_serialization = (uint64_t)p_file->get_pos();
@@ -186,7 +186,7 @@ public:
 };
 
 struct NexusBytecodeArgument : public NexusSerializedBytecode {
-    NexusSerializedBytecode::DataType type;
+    NexusStandardType type;
     void* data{};
 
     template <class T>
@@ -197,41 +197,41 @@ struct NexusBytecodeArgument : public NexusSerializedBytecode {
     _FORCE_INLINE_ const T& get_data() const {
         return *(const T*)data;
     }
-    _FORCE_INLINE_ explicit NexusBytecodeArgument(NexusSerializedBytecode::DataType p_type) {
+    _FORCE_INLINE_ explicit NexusBytecodeArgument(NexusStandardType p_type) {
         type = p_type;
         data = nullptr;
     }
-    _FORCE_INLINE_ NexusBytecodeArgument() : NexusBytecodeArgument(NONE) {}
-    NexusBytecodeArgument(StackStructMetadata* p_struct_metadata) {
-        type = STACK_STRUCT;
+    _FORCE_INLINE_ NexusBytecodeArgument() : NexusBytecodeArgument(NexusStandardType::NONE) {}
+    explicit NexusBytecodeArgument(StackStructMetadata* p_struct_metadata) {
+        type = NexusStandardType::STACK_STRUCT;
         data = p_struct_metadata;
     }
     _FORCE_INLINE_ explicit NexusBytecodeArgument(const uint32_t& p_value){
-        type = UNSIGNED_32_BIT_INTEGER;
+        type = NexusStandardType::UNSIGNED_32_BIT_INTEGER;
         auto_store(p_value);
     }
     _FORCE_INLINE_ explicit NexusBytecodeArgument(const int32_t& p_value){
-        type = SIGNED_32_BIT_INTEGER;
+        type = NexusStandardType::SIGNED_32_BIT_INTEGER;
         auto_store(p_value);
     }
     _FORCE_INLINE_ explicit NexusBytecodeArgument(const uint64_t& p_value){
-        type = UNSIGNED_64_BIT_INTEGER;
+        type = NexusStandardType::UNSIGNED_64_BIT_INTEGER;
         auto_store(p_value);
     }
     _FORCE_INLINE_ explicit NexusBytecodeArgument(const int64_t& p_value){
-        type = SIGNED_64_BIT_INTEGER;
+        type = NexusStandardType::SIGNED_64_BIT_INTEGER;
         auto_store(p_value);
     }
     _FORCE_INLINE_ explicit NexusBytecodeArgument(const float& p_value){
-        type = SINGLE_PRECISION_FLOATING_POINT;
+        type = NexusStandardType::SINGLE_PRECISION_FLOATING_POINT;
         auto_store(p_value);
     }
     _FORCE_INLINE_ explicit NexusBytecodeArgument(const double& p_value){
-        type = DOUBLE_PRECISION_FLOATING_POINT;
+        type = NexusStandardType::DOUBLE_PRECISION_FLOATING_POINT;
         auto_store(p_value);
     }
-    _FORCE_INLINE_ explicit NexusBytecodeArgument(const VString& p_value){
-        type = STRING_LITERAL;
+    _FORCE_INLINE_ explicit NexusBytecodeArgument(const InternedString& p_value){
+        type = NexusStandardType::STRING_LITERAL;
         auto_store(p_value);
     }
     ~NexusBytecodeArgument() override;
@@ -255,8 +255,7 @@ public:
 struct NexusBytecodeMethodBody : public NexusSerializedBytecode {
 private:
 public:
-    // VString instead of CharString for greater compatibility
-    VString method_name{};
+    InternedString method_name{};
     Vector<Ref<NexusBytecodeArgument>> arguments{};
     uint16_t max_stack{};
     Vector<Ref<NexusBytecodeArgument>> locals_init{};
@@ -278,17 +277,10 @@ public:
     static constexpr uint32_t VERSION = 0x000100;
     static constexpr uint32_t INSTRUCTIONS_RESERVED = 32; // 256 bit
 private:
-    // Constants
-//    Vector<uint32_t> u32_constants{};
-//    Vector<uint64_t> u64_constants{};
-//    Vector<float> f32_constants{};
-//    Vector<double> f64_constants{};
-//    Vector<VString> string_literals{};
-    // Method metadata_record
     Vector<Ref<NexusBytecodeMethodMetadata>> methods_metadata{};
     Vector<Ref<NexusBytecodeMethodBody>> method_bodies{};
-    HashMap<VString, Ref<NexusBytecodeMethodMetadata>> metadata_map{};
-    HashMap<VString, Ref<NexusBytecodeMethodBody>> bodies_map{};
+    HashMap<InternedString, Ref<NexusBytecodeMethodMetadata>> metadata_map{};
+    HashMap<InternedString, Ref<NexusBytecodeMethodBody>> bodies_map{};
 public:
     void deserialize(const FilePointer& p_file) override;
     void serialize(FilePointer& p_file) const override;
@@ -296,8 +288,8 @@ public:
     void load_methods_body(const FilePointer& p_file);
     _FORCE_INLINE_ const Vector<Ref<NexusBytecodeMethodMetadata>>& get_methods_metadata() const { return methods_metadata; }
     _FORCE_INLINE_ const Vector<Ref<NexusBytecodeMethodBody>>& get_method_bodies() const { return method_bodies; }
-    _FORCE_INLINE_ const HashMap<VString, Ref<NexusBytecodeMethodMetadata>>& get_metadata_map() const { return metadata_map; }
-    _FORCE_INLINE_ const HashMap<VString, Ref<NexusBytecodeMethodBody>>& get_bodies_map() const { return bodies_map; }
+    _FORCE_INLINE_ const HashMap<InternedString, Ref<NexusBytecodeMethodMetadata>>& get_metadata_map() const { return metadata_map; }
+    _FORCE_INLINE_ const HashMap<InternedString, Ref<NexusBytecodeMethodBody>>& get_bodies_map() const { return bodies_map; }
 
 private:
     _FORCE_INLINE_ void parse_from_file(const FilePointer& p_file) { deserialize(p_file); }
@@ -325,7 +317,7 @@ public:
 
 struct NexusBytecodeInstance;
 
-struct NexusMethodPointer : public ManagedObject {
+struct NexusMethodPointer : public ThreadSafeObject {
 private:
     const NexusTypeInfoServer* type_info_server;
 public:
@@ -337,7 +329,7 @@ public:
     virtual Ref<NexusBytecodeMethodMetadata> get_method_metadata() const = 0;
     virtual Vector<Ref<NexusBytecodeArgument>> get_arguments() const = 0;
     
-    virtual void load_method(const Ref<NexusBytecodeInstance>& p_bci, const VString& p_method_name) = 0;
+    virtual void load_method(const Ref<NexusBytecodeInstance>& p_bci, const InternedString& p_method_name) = 0;
 
     const NexusTypeInfoServer* get_type_info_server() const;
 };
@@ -358,7 +350,7 @@ public:
     Ref<NexusBytecodeMethodMetadata> get_method_metadata() const override;
     Vector<Ref<NexusBytecodeArgument>> get_arguments() const override;
     
-    void load_method(const Ref<NexusBytecodeInstance>& p_bci, const VString& p_method_name) override;
+    void load_method(const Ref<NexusBytecodeInstance>& p_bci, const InternedString& p_method_name) override;
 };
 
 struct NexusMethodPointerMemory : public NexusMethodPointer {
@@ -375,10 +367,10 @@ public:
     Ref<NexusBytecodeMethodMetadata> get_method_metadata() const override;
     Vector<Ref<NexusBytecodeArgument>> get_arguments() const override;
 
-    void load_method(const Ref<NexusBytecodeInstance>& p_bci, const VString& p_method_name) override;
+    void load_method(const Ref<NexusBytecodeInstance>& p_bci, const InternedString& p_method_name) override;
 };
 
-struct NexusBytecodeInstance : public ManagedObject {
+struct NexusBytecodeInstance : public ThreadSafeObject {
 public:
     enum BytecodeLoadMode : unsigned int {
         LOAD_HEADER,
@@ -393,12 +385,12 @@ public:
     BytecodeLoadMode load_mode;
     FilePointer file_pointer;
     Ref<NexusBytecode> bytecode;
-    HashMap<VString, size_t> bodies_location{};
+    HashMap<InternedString, size_t> bodies_location{};
     uint64_t header_end{};
     NexusBytecodeInstance(const NexusTypeInfoServer* p_type_info_server, const FilePointer& p_fp, BytecodeLoadMode p_load_mode);
-    NexusBytecodeInstance(const NexusTypeInfoServer* p_type_info_server, const VString& p_bc_path, BytecodeLoadMode p_load_mode);
+    NexusBytecodeInstance(const NexusTypeInfoServer* p_type_info_server, const InternedString& p_bc_path, BytecodeLoadMode p_load_mode);
 
-    _FORCE_INLINE_ Ref<NexusMethodPointer> get_method(const VString& p_method_name) const {
+    _FORCE_INLINE_ Ref<NexusMethodPointer> get_method(const InternedString& p_method_name) const {
         GUARD(lock);
         if (!bytecode->get_metadata_map().has(p_method_name)) throw BytecodeException("Method not found");
         Ref<NexusMethodPointer> ptr = Ref<NexusMethodPointer>::null();

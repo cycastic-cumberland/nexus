@@ -13,7 +13,6 @@ uint64_t ManagedThread::thread_id_hash(const std::thread::id &p_native_id) {
     return hasher(p_native_id);
 }
 
-
 bool ManagedThread::is_started() const {
     R_GUARD(lock);
     return id != thread_id_hash(std::thread::id());
@@ -32,7 +31,7 @@ bool ManagedThread::is_finished() const {
 void ManagedThread::join() {
     W_GUARD(lock);
     if (id != thread_id_hash(std::thread::id())) {
-        if (id == ManagedThread::get_caller_id()){
+        if (id == ManagedThread::this_thread_id()){
             print_error(VString("ManagedThread ") + uitos(id) + " can't join itself.");
             return;
         }
@@ -43,7 +42,7 @@ void ManagedThread::join() {
     }
 }
 
-ManagedThread::ID ManagedThread::get_caller_id() {
+ManagedThread::ID ManagedThread::this_thread_id() {
     if (likely(caller_id_cached)) {
         return caller_id;
     } else {

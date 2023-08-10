@@ -23,8 +23,8 @@ public:
     virtual ~BaseObject() = default;
 };
 
-// Decentralized, Safe Object
-class SafeObject : public BaseObject {
+// Decentralized, Thread safe Object
+class ThreadSafeObject : public BaseObject {
 private:
     mutable SafeRefCount refcount{};
 public:
@@ -33,11 +33,11 @@ public:
     bool unref() const override { return refcount.unref(); }
     uint32_t get_reference_count() const override { return refcount.get(); }
 
-    ~SafeObject() override = default;
+    ~ThreadSafeObject() override = default;
 };
 
-// Decentralized, Unsafe Object
-class UnsafeObject : public BaseObject {
+// Decentralized, Thread unsafe Object
+class ThreadUnsafeObject : public BaseObject {
 private:
     mutable uint32_t refcount{};
 public:
@@ -46,11 +46,11 @@ public:
     bool unref() const override { return --refcount == 0; }
     uint32_t get_reference_count() const override { return refcount; }
 
-    ~UnsafeObject() override = default;
+    ~ThreadUnsafeObject() override = default;
 };
 
-// Centralized, Safe Object
-class ManagedObject : public SafeObject {
+// Centralized, thread safe Object
+class ManagedObject : public ThreadSafeObject {
 private:
     uint64_t object_id{};
 

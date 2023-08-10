@@ -67,6 +67,7 @@ protected:
 public:
     _NO_DISCARD_ virtual size_t size() const { return heap.size(); }
     _NO_DISCARD_ _ALWAYS_INLINE_ bool empty() const { return size() == 0; }
+    _NO_DISCARD_ _ALWAYS_INLINE_ const T& operator[](const size_t p_idx) const { return heap[p_idx]; }
 
     virtual void push(const T& p_value, const uint8_t& p_priority){
         heap.push_back(Node(p_value, p_priority));

@@ -23,13 +23,13 @@ public:
         static_assert(sizeof(CustomStackStruct) == sizeof(CustomStackStruct::i64) + sizeof(CustomStackStruct::f64) + sizeof(CustomStackStruct::string));
         InternedString::configure();
         type_info_server = new NexusTypeInfoServer(false);
-        auto struct_vtable = type_info_server->get_primitive_vtable(NexusSerializedBytecode::STACK_STRUCT);
+        auto struct_vtable = type_info_server->get_primitive_vtable(NexusStandardType::STACK_STRUCT);
         // 1 MiB
         stack = new NexusStack(type_info_server, 1024 * 1024, 16);
         LinkedList<const StackItemMetadata*> custom_stack_struct_metadata = {
-            type_info_server->get_primitive_metadata(NexusBytecodeMetadata::UNSIGNED_64_BIT_INTEGER),
-            type_info_server->get_primitive_metadata(NexusBytecodeMetadata::DOUBLE_PRECISION_FLOATING_POINT),
-            type_info_server->get_primitive_metadata(NexusBytecodeMetadata::STRING)
+            type_info_server->get_primitive_metadata(NexusStandardType::UNSIGNED_64_BIT_INTEGER),
+            type_info_server->get_primitive_metadata(NexusStandardType::DOUBLE_PRECISION_FLOATING_POINT),
+            type_info_server->get_primitive_metadata(NexusStandardType::STRING)
         };
         custom_stack_struct_id = type_info_server->add_struct_type(struct_vtable, std::move(custom_stack_struct_metadata));
         struct_metadata = type_info_server->get_metadata_by_id(custom_stack_struct_id);
@@ -75,9 +75,9 @@ public:
         auto str = frame->get_at(-2);
         auto obj = frame->get_at(-1);
 
-        if (i32.type->type != NexusSerializedBytecode::SIGNED_32_BIT_INTEGER) return false;
-        if (f32.type->type != NexusSerializedBytecode::SINGLE_PRECISION_FLOATING_POINT) return false;
-        if (str.type->type != NexusSerializedBytecode::STRING_LITERAL) return false;
+        if (i32.type->type != NexusStandardType::SIGNED_32_BIT_INTEGER) return false;
+        if (f32.type->type != NexusStandardType::SINGLE_PRECISION_FLOATING_POINT) return false;
+        if (str.type->type != NexusStandardType::STRING_LITERAL) return false;
 
         if (CAST(i32, int32_t) != 12) return false;
         if (CAST(f32, float) != 32.0f) return false;
@@ -118,9 +118,9 @@ public:
         auto str = frame->get_at(-2);
         auto obj = frame->get_at(-1);
 
-        if (i32.type->type != NexusSerializedBytecode::SIGNED_32_BIT_INTEGER) return false;
-        if (f32.type->type != NexusSerializedBytecode::SINGLE_PRECISION_FLOATING_POINT) return false;
-        if (str.type->type != NexusSerializedBytecode::STRING_LITERAL) return false;
+        if (i32.type->type != NexusStandardType::SIGNED_32_BIT_INTEGER) return false;
+        if (f32.type->type != NexusStandardType::SINGLE_PRECISION_FLOATING_POINT) return false;
+        if (str.type->type != NexusStandardType::STRING_LITERAL) return false;
 
         if (CAST(i32, int32_t) != 22) return false;
         if (CAST(f32, float) != 42.0f) return false;

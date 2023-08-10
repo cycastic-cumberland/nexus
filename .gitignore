@@ -1,6 +1,6 @@
 .idea/
 .vs/
 .vscode/
-cmake-build-debug/
-cmake-build-debug-wsl/
+cmake-build-*/
 build/
+.bash_history

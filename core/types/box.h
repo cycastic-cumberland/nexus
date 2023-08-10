@@ -7,7 +7,7 @@
 
 #include "object.h"
 
-template <typename T, class RefCounter = SafeObject>
+template <typename T, class RefCounter = ThreadSafeObject>
 class Box {
 private:
     class InnerPointer : public RefCounter {
@@ -42,12 +42,22 @@ public:
     _FORCE_INLINE_ T *ptr() {
         return &inner_ptr.ptr()->data;
     }
+    _FORCE_INLINE_ const T& ref() const {
+        return inner_ptr.ptr()->data;
+    }
+    _FORCE_INLINE_ T& ref() {
+        return inner_ptr.ptr()->data;
+    }
     _FORCE_INLINE_ const T *operator*() const {
         return &inner_ptr.ptr()->data;
     }
     _NO_DISCARD_ _FORCE_INLINE_ bool is_null() const { return inner_ptr.is_null(); }
     _NO_DISCARD_ _FORCE_INLINE_ bool is_valid() const { return inner_ptr.is_valid(); }
     _FORCE_INLINE_ void clear_reference() { inner_ptr = Ref<Box<T, RefCounter>::InnerPointer>::null(); }
+    _FORCE_INLINE_ Box& operator=(const Box& p_other) {
+        inner_ptr = p_other.inner_ptr;
+        return *this;
+    }
     Box() : inner_ptr() {}
     Box(const T& p_data) {
         inner_ptr = Ref<Box<T, RefCounter>::InnerPointer>::make_ref(p_data);
@@ -63,5 +73,10 @@ public:
     }
     ~Box() = default;
 };
+
+template<class T>
+using UnsafeBox = Box<T, ThreadUnsafeObject>;
+template<class T>
+using SafeBox = Box<T, ThreadSafeObject>;
 
 #endif //NEXUS_BOX_H
